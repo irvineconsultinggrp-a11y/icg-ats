@@ -8,7 +8,7 @@ export interface Note {
 export interface FRQQuestion {
   id: string;
   question: string;
-  max_chars: number;
+  max_words: number;
 }
 
 export interface Applicant {

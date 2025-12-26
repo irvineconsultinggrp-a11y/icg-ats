@@ -44,7 +44,7 @@ export default function ApplyPage() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [frqQuestions, setFrqQuestions] = useState<Array<{ id: string; question: string; max_words: number }>>([]);
+  const [frqQuestions, setFrqQuestions] = useState<Array<{ id: string; question: string; max_chars: number }>>([]);
   const [fileError, setFileError] = useState<string>('');
   const [timeSlots, setTimeSlots] = useState<Array<{
     id: string;
@@ -422,18 +422,9 @@ export default function ApplyPage() {
     return allQuestionsAnswered && formData.resumeFile !== null;
   };
 
-  const countWords = (text: string): number => {
-    // Trim whitespace and split by spaces, filtering out empty strings
-    const words = text.trim().split(/\s+/).filter(word => word.length > 0);
-    return words.length;
-  };
-
-  const handleFRQChange = (questionId: string, value: string, maxWords: number) => {
-    // Count words in the current value
-    const wordCount = countWords(value);
-
-    // Prevent typing beyond max words
-    if (wordCount > maxWords) {
+  const handleFRQChange = (questionId: string, value: string, maxChars: number) => {
+    // Prevent typing beyond max characters
+    if (value.length > maxChars) {
       return;
     }
 
@@ -815,11 +806,11 @@ export default function ApplyPage() {
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             Question {index + 1} <span className="text-red-500">*</span>
                           </label>
-                          <p style={{ whiteSpace: "pre-line" }} className="text-gray-800 mb-3 font-bold">{question.question}</p>
+                          <p className="text-gray-800 mb-3 font-bold">{question.question}</p>
 
                           <textarea
                             value={answer}
-                            onChange={(e) => handleFRQChange(question.id, e.target.value, question.max_words)}
+                            onChange={(e) => handleFRQChange(question.id, e.target.value, question.max_chars)}
                             rows={6}
                             className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-icg-navy focus:border-transparent transition-colors resize-none text-black bg-white ${
                               errors[errorKey] ? 'border-red-500' : 'border-gray-300'
@@ -835,12 +826,12 @@ export default function ApplyPage() {
                             </div>
                             <p
                               className={`text-sm ${
-                                countWords(answer) >= question.max_words
+                                answer.length >= question.max_chars
                                   ? 'text-red-500 font-semibold'
                                   : 'text-gray-500'
                               }`}
                             >
-                              {countWords(answer)} / {question.max_words} words
+                              {answer.length} / {question.max_chars}
                             </p>
                           </div>
                         </div>
