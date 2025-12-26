@@ -395,6 +395,9 @@ export default function SchedulePage() {
                     const showAssignButton = selectedApplicant && isAvailable && !isFull;
                     const isUnavailable = selectedApplicant && !isAvailable;
 
+                    // Determine room color
+                    const roomColor = slot.room === 'Room 1' ? 'bg-blue-100 text-blue-800 border-blue-300' : 'bg-purple-100 text-purple-800 border-purple-300';
+
                     return (
                       <div
                         key={slot.id}
@@ -410,23 +413,28 @@ export default function SchedulePage() {
                         }`}
                       >
                         <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <h4 className="font-semibold text-gray-900">
-                              {slot.display_label}
-                              {isAvailable && selectedApplicant && (
-                                <span className="ml-2 text-xs font-medium text-green-600">
-                                  ✓ Available
-                                </span>
-                              )}
-                              {isUnavailable && (
-                                <span className="ml-2 text-xs font-medium text-gray-500">
-                                  ✗ Unavailable
-                                </span>
-                              )}
-                            </h4>
-                            <p className="text-xs text-gray-500 mt-1">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-semibold text-gray-900">
+                                {slot.display_label}
+                              </h4>
+                              <span className={`px-2 py-0.5 text-xs font-semibold rounded border ${roomColor}`}>
+                                {slot.room}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500">
                               {slot.start_time} - {slot.end_time}
                             </p>
+                            {isAvailable && selectedApplicant && (
+                              <span className="text-xs font-medium text-green-600 mt-1 inline-block">
+                                ✓ Available
+                              </span>
+                            )}
+                            {isUnavailable && (
+                              <span className="text-xs font-medium text-gray-500 mt-1 inline-block">
+                                ✗ Unavailable
+                              </span>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-3">
@@ -529,6 +537,10 @@ export default function SchedulePage() {
                   <p className="font-semibold text-gray-900">{selectedSlot.display_label}</p>
                 </div>
                 <div>
+                  <p className="text-sm text-gray-600">Room</p>
+                  <p className="font-semibold text-gray-900">{selectedSlot.room}</p>
+                </div>
+                <div>
                   <p className="text-sm text-gray-600">Capacity</p>
                   <p className="font-semibold text-gray-900">
                     {selectedSlot.assignedApplicants.length} / {selectedSlot.max_capacity}
@@ -538,7 +550,7 @@ export default function SchedulePage() {
                   <p className="text-sm text-gray-600">Day</p>
                   <p className="font-semibold text-gray-900">{selectedSlot.day_of_week}</p>
                 </div>
-                <div>
+                <div className="col-span-2">
                   <p className="text-sm text-gray-600">Slot ID</p>
                   <p className="font-mono text-xs text-gray-900">{selectedSlot.id}</p>
                 </div>

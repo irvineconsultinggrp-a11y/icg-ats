@@ -42,6 +42,7 @@ export interface TimeSlot {
   day_of_week: string;
   start_time: string;
   end_time: string;
+  room: string;
   display_label: string;
   max_capacity: number;
   is_active: boolean;

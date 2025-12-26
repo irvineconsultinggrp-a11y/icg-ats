@@ -99,31 +99,49 @@ export function autoAssignInterviews(
       return;
     }
 
-    // Try to assign to the first available slot
+    // Try to assign to an available slot, preferring rooms with more capacity
     let assigned = false;
 
-    for (const slotId of applicant.available_slots) {
-      const capacity = slotCapacities.get(slotId);
-
-      if (capacity && capacity.availableSpots > 0) {
-        // Find the actual TimeSlot object
+    // Filter to only available slots and sort by available capacity (descending)
+    const availableSlots = applicant.available_slots
+      .map((slotId) => {
+        const capacity = slotCapacities.get(slotId);
         const timeSlot = timeSlots.find((ts) => ts.id === slotId);
 
-        if (timeSlot) {
-          // Assign this applicant to this slot
-          placed.push({
-            applicant: { ...applicant, assigned_slot: slotId },
-            assignedSlot: timeSlot,
-          });
-
-          // Update the capacity tracker
-          capacity.availableSpots -= 1;
-          capacity.currentCount += 1;
-
-          assigned = true;
-          break;
+        if (capacity && capacity.availableSpots > 0 && timeSlot) {
+          return { slotId, capacity, timeSlot };
         }
-      }
+        return null;
+      })
+      .filter((slot): slot is NonNullable<typeof slot> => slot !== null)
+      .sort((a, b) => {
+        // First sort by time period to maintain time preference
+        const timeCompare = `${a.timeSlot.day_of_week}-${a.timeSlot.start_time}`.localeCompare(
+          `${b.timeSlot.day_of_week}-${b.timeSlot.start_time}`
+        );
+
+        if (timeCompare !== 0) {
+          return timeCompare;
+        }
+
+        // Within same time period, prefer room with more available spots (for balance)
+        return b.capacity.availableSpots - a.capacity.availableSpots;
+      });
+
+    if (availableSlots.length > 0) {
+      const { slotId, capacity, timeSlot } = availableSlots[0];
+
+      // Assign this applicant to this slot
+      placed.push({
+        applicant: { ...applicant, assigned_slot: slotId },
+        assignedSlot: timeSlot,
+      });
+
+      // Update the capacity tracker
+      capacity.availableSpots -= 1;
+      capacity.currentCount += 1;
+
+      assigned = true;
     }
 
     if (!assigned) {

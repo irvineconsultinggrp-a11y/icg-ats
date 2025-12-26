@@ -51,6 +51,7 @@ export default function ApplyPage() {
     day_of_week: string;
     start_time: string;
     end_time: string;
+    room: string;
     display_label: string;
     max_capacity: number;
     is_active: boolean;
@@ -184,16 +185,17 @@ export default function ApplyPage() {
     setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
-  const handleSlotToggle = (slotId: string) => {
+  const handleSlotToggle = (slotIds: string[]) => {
     setFormData((prev) => {
       const currentSlots = prev.availableSlots;
-      const isSelected = currentSlots.includes(slotId);
+      // Check if any of the room slots are already selected
+      const isSelected = slotIds.some((id) => currentSlots.includes(id));
 
       return {
         ...prev,
         availableSlots: isSelected
-          ? currentSlots.filter((id) => id !== slotId)
-          : [...currentSlots, slotId],
+          ? currentSlots.filter((id) => !slotIds.includes(id)) // Remove all room slots
+          : [...currentSlots, ...slotIds], // Add all room slots
       };
     });
   };
@@ -231,6 +233,65 @@ export default function ApplyPage() {
       }
       return acc;
     }, {} as Record<string, typeof timeSlots>);
+  };
+
+  // Group time slots by time period (collapsing rooms for applicant display)
+  const groupSlotsByPeriod = () => {
+    const grouped: Record<string, Array<{
+      day: string;
+      startTime: string;
+      endTime: string;
+      displayLabel: string; // Without room info
+      slotIds: string[]; // All room IDs for this time period
+    }>> = {};
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+    // Group slots by time period key (day + start + end)
+    const periodMap: Record<string, Array<typeof timeSlots[0]>> = {};
+
+    timeSlots.forEach((slot) => {
+      const periodKey = `${slot.day_of_week}|${slot.start_time}|${slot.end_time}`;
+      if (!periodMap[periodKey]) {
+        periodMap[periodKey] = [];
+      }
+      periodMap[periodKey].push(slot);
+    });
+
+    // Convert to grouped structure by day
+    Object.values(periodMap).forEach((periodSlots) => {
+      if (periodSlots.length === 0) return;
+
+      const firstSlot = periodSlots[0];
+      const day = firstSlot.day_of_week;
+
+      if (!grouped[day]) {
+        grouped[day] = [];
+      }
+
+      // Create display label without room info
+      const displayLabel = firstSlot.display_label.replace(/\s*\(Room \d+\)\s*$/, '');
+
+      grouped[day].push({
+        day: firstSlot.day_of_week,
+        startTime: firstSlot.start_time,
+        endTime: firstSlot.end_time,
+        displayLabel,
+        slotIds: periodSlots.map((s) => s.id),
+      });
+    });
+
+    // Sort slots within each day by start time
+    Object.keys(grouped).forEach((day) => {
+      grouped[day].sort((a, b) => a.startTime.localeCompare(b.startTime));
+    });
+
+    // Return sorted by day order
+    return dayOrder.reduce((acc, day) => {
+      if (grouped[day]) {
+        acc[day] = grouped[day];
+      }
+      return acc;
+    }, {} as typeof grouped);
   };
 
   const handleNext = () => {
@@ -943,7 +1004,7 @@ export default function ApplyPage() {
                 {/* Selected Count */}
                 <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-icg-light rounded-lg border border-icg-blue">
                   <p className="text-xs sm:text-sm font-semibold text-icg-navy">
-                    {formData.availableSlots.length} slot{formData.availableSlots.length !== 1 ? 's' : ''} selected
+                    {formData.availableSlots.length/2} slot{formData.availableSlots.length !== 2 ? 's' : ''} selected
                     {formData.availableSlots.length === 0 && (
                       <span className="text-gray-600 ml-2">
                         (Select your available times)
@@ -954,20 +1015,20 @@ export default function ApplyPage() {
 
                 {/* Time Slots by Day */}
                 <div className="space-y-4 sm:space-y-6">
-                  {Object.keys(groupSlotsByDay()).length > 0 ? (
-                    Object.entries(groupSlotsByDay()).map(([day, slots]) => (
+                  {Object.keys(groupSlotsByPeriod()).length > 0 ? (
+                    Object.entries(groupSlotsByPeriod()).map(([day, periods]) => (
                       <div key={day} className="border-b border-gray-200 pb-4 sm:pb-6 last:border-b-0">
                         <h3 className="text-base sm:text-lg font-semibold text-icg-navy mb-3 sm:mb-4">
                           {day}
                         </h3>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
-                          {slots.map((slot) => {
-                            const isSelected = formData.availableSlots.includes(slot.id);
+                          {periods.map((period, idx) => {
+                            const isSelected = period.slotIds.some((id) => formData.availableSlots.includes(id));
 
                             return (
                               <label
-                                key={slot.id}
+                                key={`${period.day}-${period.startTime}-${idx}`}
                                 className={`flex items-center p-2 sm:p-3 border-2 rounded-lg cursor-pointer transition-all ${
                                   isSelected
                                     ? 'border-icg-navy bg-icg-light'
@@ -977,7 +1038,7 @@ export default function ApplyPage() {
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
-                                  onChange={() => handleSlotToggle(slot.id)}
+                                  onChange={() => handleSlotToggle(period.slotIds)}
                                   className="w-4 h-4 flex-shrink-0 text-icg-navy border-gray-300 rounded focus:ring-icg-navy focus:ring-2"
                                 />
                                 <span
@@ -985,7 +1046,7 @@ export default function ApplyPage() {
                                     isSelected ? 'text-icg-navy' : 'text-gray-700'
                                   }`}
                                 >
-                                  {slot.display_label}
+                                  {period.displayLabel}
                                 </span>
                               </label>
                             );
