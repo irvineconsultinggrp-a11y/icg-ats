@@ -280,9 +280,32 @@ export default function ApplyPage() {
       });
     });
 
-    // Sort slots within each day by start time
+    // Sort slots within each day by start time (convert to 24-hour for proper ordering)
     Object.keys(grouped).forEach((day) => {
-      grouped[day].sort((a, b) => a.startTime.localeCompare(b.startTime));
+      grouped[day].sort((a, b) => {
+        const getTimeIn24h = (period: { startTime: string; displayLabel: string }) => {
+          const [hour, minutes] = period.startTime.split(':').map(Number);
+          const label = period.displayLabel;
+          const startPart = label.split('-')[0].trim();
+          
+          // Determine if start time is PM
+          let isPM = false;
+          if (startPart.includes(' PM')) {
+            isPM = true;
+          } else if (!startPart.includes(' AM')) {
+            // No AM/PM in start part, check end of label (but not if it says "AM-")
+            isPM = label.endsWith(' PM') && !label.includes(' AM-');
+          }
+          
+          let hour24 = hour;
+          if (isPM && hour !== 12) hour24 += 12;
+          else if (!isPM && hour === 12) hour24 = 0;
+          
+          return hour24 * 60 + minutes;
+        };
+        
+        return getTimeIn24h(a) - getTimeIn24h(b);
+      });
     });
 
     // Return sorted by day order
@@ -998,7 +1021,7 @@ export default function ApplyPage() {
                   Interview Availability
                 </h2>
                 <p className="text-sm sm:text-base text-gray-600 mb-4">
-                  Please select all time slots when you would be available for an interview. (At least 1 slot per day).
+                  Please select all time slots when you would be available for interviews. (At least 1 slot per day).
                 </p>
 
                 {/* Selected Count */}
