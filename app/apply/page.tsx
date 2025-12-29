@@ -998,13 +998,19 @@ export default function ApplyPage() {
                   Interview Availability
                 </h2>
                 <p className="text-sm sm:text-base text-gray-600 mb-4">
-                  Please select all time slots when you would be available for an interview.
+                  Please select all time slots when you would be available for an interview. (At least 1 slot per day).
                 </p>
 
                 {/* Selected Count */}
                 <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-icg-light rounded-lg border border-icg-blue">
                   <p className="text-xs sm:text-sm font-semibold text-icg-navy">
-                    {formData.availableSlots.length/2} slot{formData.availableSlots.length !== 2 ? 's' : ''} selected
+                    {(() => {
+                      const periods = Object.values(groupSlotsByPeriod()).flat();
+                      const selectedCount = periods.filter(period => 
+                        period.slotIds.some(id => formData.availableSlots.includes(id))
+                      ).length;
+                      return `${selectedCount} slot${selectedCount !== 1 ? 's' : ''} selected`;
+                    })()}
                     {formData.availableSlots.length === 0 && (
                       <span className="text-gray-600 ml-2">
                         (Select your available times)

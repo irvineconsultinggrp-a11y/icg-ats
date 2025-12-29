@@ -83,12 +83,12 @@ export default function LandingPage() {
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-12">
         {/* Heading */}
-        <h1 className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-bold text-white text-center mb-4">
+        <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-semibold text-white text-center mb-4">
           Junior Associate Program
         </h1>
 
         {/* Subheading */}
-        <p className="text-2xl sm:text-3xl md:text-4xl text-white text-center mb-12">
+        <p className="text-xl sm:text-2xl md:text-3xl text-white text-center mb-12">
           Winter 2026 Recruitment
         </p>
 
@@ -99,7 +99,7 @@ export default function LandingPage() {
             disabled={!applicationsOpen}
             className={`px-16 py-5 text-lg sm:text-xl font-semibold rounded-full transition-all ${
               applicationsOpen
-                ? 'bg-white text-black hover:bg-gray-100'
+                ? 'bg-white text-black hover:bg-gray-00'
                 : 'bg-gray-400 text-gray-600 cursor-not-allowed'
             }`}
           >
@@ -110,7 +110,7 @@ export default function LandingPage() {
             href="https://irvineconsultinggroup.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-16 py-5 text-lg sm:text-xl font-semibold rounded-full bg-white text-black hover:bg-gray-100 transition-all text-center"
+            className="px-16 py-5 text-lg sm:text-xl font-semibold rounded-full bg-white text-black hover:bg-gray-200 transition-all text-center"
           >
             COFFEE CHAT SIGN-UP
           </a>
