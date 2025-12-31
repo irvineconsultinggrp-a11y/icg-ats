@@ -107,9 +107,7 @@ export default function LandingPage() {
           </button>
 
           <a
-            href="https://irvineconsultinggroup.com"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/coffee-chat"
             className="px-16 py-5 text-lg sm:text-xl font-semibold rounded-full bg-white text-black hover:bg-gray-200 transition-all text-center"
           >
             COFFEE CHAT SIGN-UP

@@ -35,3 +35,69 @@ select::placeholder {
   color: #E5E7EB;
   opacity: 1;
 }
+
+/* Candid Carousel - Infinite Scroll */
+.candid-carousel-wrapper {
+  overflow: hidden;
+  width: 100%;
+}
+
+.candid-carousel-track {
+  display: flex;
+  gap: 0.75rem;
+  width: max-content;
+}
+
+.candid-carousel-track img {
+  height: 160px;
+  width: 240px;
+  object-fit: cover;
+  border-radius: 0.75rem;
+  flex-shrink: 0;
+  background-color: #E8F0F7;
+}
+
+@media (min-width: 640px) {
+  .candid-carousel-track {
+    gap: 1rem;
+  }
+  .candid-carousel-track img {
+    height: 200px;
+    width: 300px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .candid-carousel-track img {
+    height: 240px;
+    width: 360px;
+  }
+}
+
+/* Row 1: Scroll left to right */
+.candid-carousel-track-ltr {
+  animation: scroll-ltr 40s linear infinite;
+}
+
+/* Row 2: Scroll right to left */
+.candid-carousel-track-rtl {
+  animation: scroll-rtl 40s linear infinite;
+}
+
+@keyframes scroll-ltr {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0%);
+  }
+}
+
+@keyframes scroll-rtl {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
