@@ -112,7 +112,7 @@ export const coffeeChatMembers: CoffeeChatMember[] = [
     lastName: 'Krishnan',
     role: 'Strategy VP',
     headshotSrc: getHeadshotPath('Mohan'),
-    calendlyUrl: undefined,
+    calendlyUrl: 'https://calendly.com/mohank2-uci/30min',
     linkedinUrl: 'https://www.linkedin.com/in/mohan-krishnan1/',
     hobbies: 'Magic: The Gathering',
     funFact: 'I was born in Michigan',
