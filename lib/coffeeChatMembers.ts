@@ -196,7 +196,7 @@ export const coffeeChatMembers: CoffeeChatMember[] = [
     lastName: 'Marwah',
     role: 'Co-Director of Sourcing',
     headshotSrc: getHeadshotPath('Krish'),
-    calendlyUrl: undefined,
+    calendlyUrl: 'https://calendly.com/kmarwah-uci/30min',
     linkedinUrl: 'https://www.linkedin.com/in/krishmarwah/',
     hobbies: 'Acting; Boxing',
     funFact: 'I appeared on Netflix',
