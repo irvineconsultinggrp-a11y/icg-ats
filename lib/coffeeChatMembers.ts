@@ -119,6 +119,18 @@ export const coffeeChatMembers: CoffeeChatMember[] = [
     lookingForwardTo: 'Kura Sushi and 7Leaves projects',
   },
   {
+    id: 'brian-lee',
+    firstName: 'Brian',
+    lastName: 'Lee',
+    role: 'Consultant',
+    headshotSrc: getHeadshotPath('Brian'),
+    calendlyUrl: 'https://calendly.com/bhlee6-uci/30min',
+    linkedinUrl: 'https://www.linkedin.com/in/brianhanlee/',
+    hobbies: 'Photography',
+    funFact: 'I think Messi is the undisputed goat so we can debate abt that',
+    lookingForwardTo: '7Leaves project because they\'re a company im very familiar with',
+  },
+  {
     id: 'aaron-johnson',
     firstName: 'Aaron',
     lastName: 'Johnson',
@@ -202,6 +214,7 @@ export const coffeeChatMembers: CoffeeChatMember[] = [
     funFact: 'I appeared on Netflix',
     lookingForwardTo: 'Kura Sushi Project',
   },
+  
 ];
 
 // Helper to get only members with Calendly links (for filtering if needed)
