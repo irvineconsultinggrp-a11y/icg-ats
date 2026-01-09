@@ -17,6 +17,13 @@ interface Note {
   created_at: string;
 }
 
+interface Vote {
+  officer_id: string;
+  officer_name: string;
+  vote_type: 'up' | 'down';
+  created_at: string;
+}
+
 interface Applicant {
   id: string;
   first_name: string;
@@ -31,6 +38,7 @@ interface Applicant {
   status: 'applied' | 'rejected' | 'interviewing' | 'scheduled' | 'rejected_after_interview' | 'accepted';
   assigned_slot: string | null;
   notes: Note[];
+  votes: Vote[];
   applied_date: string;
   last_updated: string;
 }
@@ -72,6 +80,7 @@ export default function DashboardPage() {
   const [newNote, setNewNote] = useState('');
   const [savingNote, setSavingNote] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [votingInProgress, setVotingInProgress] = useState(false);
 
   useEffect(() => {
     fetchApplicants();
@@ -280,6 +289,79 @@ export default function DashboardPage() {
     }
   };
 
+  const handleVote = async (voteType: 'up' | 'down') => {
+    if (!selectedApplicant) return;
+
+    const session = getSession();
+    if (!session) {
+      alert('You must be logged in to vote');
+      return;
+    }
+
+    setVotingInProgress(true);
+
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+      const currentVotes = selectedApplicant.votes || [];
+      const existingVoteIndex = currentVotes.findIndex(v => v.officer_id === session.id);
+
+      let updatedVotes: Vote[];
+
+      if (existingVoteIndex >= 0) {
+        const existingVote = currentVotes[existingVoteIndex];
+        if (existingVote.vote_type === voteType) {
+          // Same vote type clicked - remove the vote
+          updatedVotes = currentVotes.filter((_, i) => i !== existingVoteIndex);
+        } else {
+          // Different vote type - update the vote
+          updatedVotes = currentVotes.map((v, i) =>
+            i === existingVoteIndex
+              ? { ...v, vote_type: voteType, created_at: new Date().toISOString() }
+              : v
+          );
+        }
+      } else {
+        // No existing vote - add new vote
+        updatedVotes = [
+          ...currentVotes,
+          {
+            officer_id: session.id,
+            officer_name: session.display_name,
+            vote_type: voteType,
+            created_at: new Date().toISOString(),
+          },
+        ];
+      }
+
+      const { error } = await supabase
+        .from('applicants')
+        .update({
+          votes: updatedVotes,
+          last_updated: new Date().toISOString(),
+        })
+        .eq('id', selectedApplicant.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setSelectedApplicant({
+        ...selectedApplicant,
+        votes: updatedVotes,
+      });
+
+      // Refresh applicants list
+      await fetchApplicants();
+    } catch (error) {
+      console.error('Failed to update vote:', error);
+      alert('Failed to update vote. Please try again.');
+    } finally {
+      setVotingInProgress(false);
+    }
+  };
+
   const getSlotLabel = (slotId: string): string => {
     const slot = timeSlots.find(s => s.id === slotId);
     return slot ? slot.display_label : slotId;
@@ -407,7 +489,98 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* 2. Free Response Answers */}
+            {/* 2. Officer Votes Section */}
+            <div className="border-b border-gray-200 pb-6">
+              <h3 className="text-xl font-bold text-icg-navy mb-4">Officer Votes</h3>
+              
+              {(() => {
+                const session = getSession();
+                const votes = selectedApplicant.votes || [];
+                const upVotes = votes.filter(v => v.vote_type === 'up');
+                const downVotes = votes.filter(v => v.vote_type === 'down');
+                const currentUserVote = session ? votes.find(v => v.officer_id === session.id) : null;
+
+                return (
+                  <>
+                    {/* Vote Counts Display */}
+                    <div className="flex gap-6 mb-4">
+                      {/* Thumbs Up Box */}
+                      <div className="flex-1 bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-2xl">👍</span>
+                          <span className="text-2xl font-bold text-green-700">{upVotes.length}</span>
+                        </div>
+                        {upVotes.length > 0 ? (
+                          <ul className="text-sm text-green-800 space-y-1">
+                            {upVotes.map((vote, idx) => (
+                              <li key={idx} className="flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                                {vote.officer_name}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-sm text-green-600 italic">No votes yet</p>
+                        )}
+                      </div>
+
+                      {/* Thumbs Down Box */}
+                      <div className="flex-1 bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-2xl">👎</span>
+                          <span className="text-2xl font-bold text-red-700">{downVotes.length}</span>
+                        </div>
+                        {downVotes.length > 0 ? (
+                          <ul className="text-sm text-red-800 space-y-1">
+                            {downVotes.map((vote, idx) => (
+                              <li key={idx} className="flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                                {vote.officer_name}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-sm text-red-600 italic">No votes yet</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Vote Buttons */}
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => handleVote('up')}
+                        disabled={votingInProgress}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 ${
+                          currentUserVote?.vote_type === 'up'
+                            ? 'bg-green-600 text-white hover:bg-green-700'
+                            : 'bg-gray-100 text-gray-700 hover:bg-green-100 hover:text-green-700 border border-gray-300'
+                        }`}
+                      >
+                        <span className="text-xl">👍</span>
+                        {currentUserVote?.vote_type === 'up' ? 'Voted Up (click to remove)' : 'Vote Up'}
+                      </button>
+                      <button
+                        onClick={() => handleVote('down')}
+                        disabled={votingInProgress}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 ${
+                          currentUserVote?.vote_type === 'down'
+                            ? 'bg-red-600 text-white hover:bg-red-700'
+                            : 'bg-gray-100 text-gray-700 hover:bg-red-100 hover:text-red-700 border border-gray-300'
+                        }`}
+                      >
+                        <span className="text-xl">👎</span>
+                        {currentUserVote?.vote_type === 'down' ? 'Voted Down (click to remove)' : 'Vote Down'}
+                      </button>
+                    </div>
+                    {votingInProgress && (
+                      <p className="text-sm text-gray-500 mt-2 text-center">Updating vote...</p>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* 3. Free Response Answers */}
             <div className="border-b border-gray-200 pb-6">
               <h3 className="text-xl font-bold text-icg-navy mb-4">Free Response Answers</h3>
               {selectedApplicant.frq_responses && Array.isArray(selectedApplicant.frq_responses) ? (
