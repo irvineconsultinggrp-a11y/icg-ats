@@ -68,7 +68,7 @@ function Sidebar({ active }: { active: "home" | "applications" | "coffee-chats" 
   const navItems = [
     { key: "home" as const, label: "Home", icon: <HouseIcon />, href: "/applicant/dashboard" },
     { key: "applications" as const, label: "Applications", icon: <PencilIcon />, href: "/applicant/dashboard" },
-    { key: "coffee-chats" as const, label: "Coffee Chats", icon: <UsersIcon />, href: "/applicant/dashboard" },
+    { key: "coffee-chats" as const, label: "Coffee Chats", icon: <UsersIcon />, href: "/applicant/dashboard/coffee-chats" },
   ];
 
   return (

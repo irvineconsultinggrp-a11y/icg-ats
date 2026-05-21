@@ -60,6 +60,31 @@ function StarIcon({ filled, className }: { filled: boolean; className?: string }
   );
 }
 
+function CheckCircleIcon({ className }: { className?: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <polyline points="22 4 12 14.01 9 11.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function ChevronUpIcon({ className }: { className?: string }) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="m18 15-6-6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
 // --- Types ---
 
 type CCStatus = "pending" | "scheduled" | "completed" | "rejected";
@@ -206,7 +231,13 @@ function DetailPanel({
   const [date, setDate]   = useState(chat.scheduledDate ?? "");
   const [time, setTime]   = useState(chat.scheduledTime ?? "");
   const [officer, setOfficer] = useState(chat.assignedOfficer ?? "");
+  const [savedFlash, setSavedFlash] = useState(false);
   const initials = `${chat.firstName[0]}${chat.lastName[0]}`;
+
+  function triggerSaved() {
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 1800);
+  }
 
   function saveSchedule() {
     onUpdate({
@@ -215,6 +246,7 @@ function DetailPanel({
       assignedOfficer: officer || null,
       status: date && time ? "scheduled" : chat.status,
     });
+    triggerSaved();
   }
 
   return (
@@ -319,11 +351,17 @@ function DetailPanel({
 
         {/* Notes */}
         <div className="flex flex-col gap-2">
-          <p className="text-sm font-medium text-[#374151]">Officer Notes</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-[#374151]">Officer Notes</p>
+            <span className={`text-xs text-green-600 font-medium flex items-center gap-1 transition-opacity duration-300 ${savedFlash ? "opacity-100" : "opacity-0"}`}>
+              <CheckCircleIcon className="w-3 h-3" />
+              Saved
+            </span>
+          </div>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            onBlur={() => onUpdate({ notes })}
+            onBlur={() => { onUpdate({ notes }); triggerSaved(); }}
             rows={4}
             placeholder="Add notes from the coffee chat…"
             className="w-full border border-[#e4e4e7] rounded-lg px-4 py-3 text-sm text-[#111827] placeholder-[#a1a1aa] outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 transition resize-none"
@@ -334,15 +372,17 @@ function DetailPanel({
           <button
             type="button"
             onClick={() => onUpdate({ status: "completed" })}
-            className="flex items-center justify-center h-11 w-full bg-[#061c2a] text-white text-sm font-medium rounded-lg hover:bg-[#0d2f47] transition-colors"
+            className="group flex items-center justify-center gap-2 h-11 w-full bg-[#061c2a] text-white text-sm font-medium rounded-lg hover:bg-[#0d2f47] active:scale-[0.98] transition-all"
           >
+            <CheckCircleIcon className="w-4 h-4 group-hover:scale-110 transition-transform" />
             Advance to Decisions
           </button>
           <button
             type="button"
             onClick={() => onUpdate({ status: "rejected" })}
-            className="flex items-center justify-center h-11 w-full border border-red-200 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 transition-colors"
+            className="group flex items-center justify-center gap-2 h-11 w-full border border-red-200 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 hover:border-red-300 active:scale-[0.98] transition-all"
           >
+            <XIcon className="w-4 h-4" />
             Reject Applicant
           </button>
         </div>
@@ -371,11 +411,22 @@ export default function CoffeeChatsPage() {
   const [activeTab, setActiveTab] = useState<StatusTab>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<"name" | "status" | "score" | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const selected = chats.find((c) => c.id === selectedId) ?? null;
 
   function updateChat(id: string, patch: Partial<CoffeeChat>) {
     setChats((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  }
+
+  function handleSort(col: "name" | "status" | "score") {
+    if (sortBy === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(col);
+      setSortDir("asc");
+    }
   }
 
   const counts: Record<StatusTab, number> = {
@@ -386,16 +437,25 @@ export default function CoffeeChatsPage() {
     rejected:  chats.filter((c) => c.status === "rejected").length,
   };
 
-  const visible = chats.filter((c) => {
-    const matchesTab = activeTab === "all" || c.status === activeTab;
-    const q = search.toLowerCase();
-    const matchesSearch =
-      !q ||
-      `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
-      c.email.toLowerCase().includes(q) ||
-      c.major.toLowerCase().includes(q);
-    return matchesTab && matchesSearch;
-  });
+  const visible = chats
+    .filter((c) => {
+      const matchesTab = activeTab === "all" || c.status === activeTab;
+      const q = search.toLowerCase();
+      const matchesSearch =
+        !q ||
+        `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
+        c.email.toLowerCase().includes(q) ||
+        c.major.toLowerCase().includes(q);
+      return matchesTab && matchesSearch;
+    })
+    .sort((a, b) => {
+      if (!sortBy) return 0;
+      let cmp = 0;
+      if (sortBy === "name") cmp = `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
+      else if (sortBy === "status") cmp = a.status.localeCompare(b.status);
+      else if (sortBy === "score") cmp = (a.score ?? -1) - (b.score ?? -1);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
 
   return (
     <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -417,9 +477,9 @@ export default function CoffeeChatsPage() {
             <button
               type="button"
               onClick={() => setTemplatesOpen(true)}
-              className="flex items-center gap-2 h-9 px-4 border border-[#e4e4e7] bg-white rounded-lg text-sm font-medium text-[#374151] hover:border-[#9ca3af] hover:bg-[#f9fafb] transition-colors"
+              className="group flex items-center gap-2 h-9 px-4 border border-[#e4e4e7] bg-white rounded-lg text-sm font-medium text-[#374151] hover:border-[#061c2a] hover:bg-[#f9fafb] hover:text-[#061c2a] active:scale-[0.98] transition-all"
             >
-              <MailIcon />
+              <MailIcon className="group-hover:scale-110 transition-transform" />
               Email Templates
             </button>
 
@@ -493,9 +553,28 @@ export default function CoffeeChatsPage() {
               <table className="w-full text-sm">
                 <thead className="bg-[#f9fafb] border-b border-[#e4e4e7]">
                   <tr>
-                    {["Applicant", "Year / Major", "Scheduled", "Officer", "Status", "Score", ""].map((h) => (
-                      <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-[#6b7280] uppercase tracking-wide whitespace-nowrap">
-                        {h}
+                    {([
+                      { label: "Applicant",    sort: "name"   as const },
+                      { label: "Year / Major", sort: null },
+                      { label: "Scheduled",    sort: null },
+                      { label: "Officer",      sort: null },
+                      { label: "Status",       sort: "status" as const },
+                      { label: "Score",        sort: "score"  as const },
+                      { label: "",             sort: null },
+                    ] as { label: string; sort: "name" | "status" | "score" | null }[]).map(({ label, sort }) => (
+                      <th
+                        key={label}
+                        onClick={sort ? () => handleSort(sort) : undefined}
+                        className={`px-5 py-3 text-left text-xs font-semibold text-[#6b7280] uppercase tracking-wide whitespace-nowrap ${sort ? "cursor-pointer hover:text-[#374151] select-none" : ""}`}
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          {label}
+                          {sort && (
+                            sortBy === sort
+                              ? (sortDir === "asc" ? <ChevronUpIcon className="text-[#061c2a]" /> : <ChevronDownIcon className="text-[#061c2a]" />)
+                              : <ChevronUpIcon className="opacity-0 group-hover:opacity-40" />
+                          )}
+                        </span>
                       </th>
                     ))}
                   </tr>
@@ -509,7 +588,7 @@ export default function CoffeeChatsPage() {
                       <tr
                         key={chat.id}
                         onClick={() => setSelectedId(isSelected ? null : chat.id)}
-                        className={`cursor-pointer transition-colors ${isSelected ? "bg-[#061c2a]/5" : "bg-white hover:bg-[#f9fafb]"}`}
+                        className={`cursor-pointer transition-colors ${isSelected ? "bg-[#061c2a]/5 border-l-[3px] border-l-[#061c2a]" : "bg-white hover:bg-[#f9fafb] border-l-[3px] border-l-transparent"}`}
                       >
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-3">
@@ -561,10 +640,10 @@ export default function CoffeeChatsPage() {
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setSelectedId(isSelected ? null : chat.id); }}
-                            className="flex items-center gap-1 text-xs font-medium text-[#061c2a] hover:underline"
+                            className="group flex items-center gap-1 text-xs font-medium text-[#061c2a] hover:text-[#0d2f47] transition-colors"
                           >
-                            Review
-                            <ChevronRightIcon />
+                            {isSelected ? "Close" : "Review"}
+                            <ChevronRightIcon className={`transition-transform duration-200 ${isSelected ? "rotate-180" : "group-hover:translate-x-0.5"}`} />
                           </button>
                         </td>
                       </tr>

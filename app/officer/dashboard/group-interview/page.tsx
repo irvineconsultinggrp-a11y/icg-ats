@@ -49,14 +49,6 @@ function ChevronRightIcon({ className }: { className?: string }) {
   );
 }
 
-function ChevronRightIcon({ className }: { className?: string }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="m9 18 6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-}
-
 function MailIcon({ className }: { className?: string }) {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
@@ -103,18 +95,6 @@ const SESSIONS: Session[] = [
   { id: "s4", label: "Session D", date: "Oct 4, 2026", time: "3:00 PM – 4:30 PM",  capacity: 8 },
 ];
 
-const MOCK_APPLICANTS: Applicant[] = [
-  { id: "1",  firstName: "Aisha",   lastName: "Patel",    email: "apatel@uci.edu",    year: 2, major: "Business Economics",           gpa: "3.82", position: "Junior Associate", availableSlots: ["s1","s2"],           assignedSlot: "s1", status: "scheduled",  score: 4,    notes: "Strong case presentation, good team dynamics." },
-  { id: "2",  firstName: "Marcus",  lastName: "Chen",     email: "mchen@uci.edu",     year: 3, major: "Information & Computer Science", gpa: "3.65", position: "Junior Associate", availableSlots: ["s2","s3"],           assignedSlot: "s2", status: "scheduled",  score: null, notes: "" },
-  { id: "3",  firstName: "Sofia",   lastName: "Nguyen",   email: "snguyen@uci.edu",   year: 1, major: "Economics",                    gpa: "3.91", position: "Junior Associate", availableSlots: ["s1","s3","s4"],      assignedSlot: null, status: "pending",   score: null, notes: "" },
-  { id: "4",  firstName: "Jordan",  lastName: "Williams", email: "jwilliams@uci.edu", year: 2, major: "Political Science",            gpa: "3.55", position: "Junior Associate", availableSlots: ["s3"],               assignedSlot: "s3", status: "completed", score: 3,    notes: "Struggled with the case but showed strong potential." },
-  { id: "5",  firstName: "Priya",   lastName: "Kumar",    email: "pkumar@uci.edu",    year: 2, major: "Mathematics",                  gpa: "3.78", position: "Junior Associate", availableSlots: ["s1","s4"],           assignedSlot: "s4", status: "scheduled",  score: null, notes: "" },
-  { id: "6",  firstName: "Daniel",  lastName: "Torres",   email: "dtorres@uci.edu",   year: 3, major: "Business Economics",           gpa: "3.40", position: "Junior Associate", availableSlots: ["s2","s3"],           assignedSlot: "s3", status: "completed", score: 2,    notes: "Did not engage well in group setting." },
-  { id: "7",  firstName: "Emily",   lastName: "Zhao",     email: "ezhao@uci.edu",     year: 1, major: "Computer Science",             gpa: "3.97", position: "Junior Associate", availableSlots: ["s2"],               assignedSlot: null, status: "pending",   score: null, notes: "" },
-  { id: "8",  firstName: "Kevin",   lastName: "Park",     email: "kpark@uci.edu",     year: 2, major: "Economics",                    gpa: "3.60", position: "Junior Associate", availableSlots: ["s1","s2","s3","s4"], assignedSlot: "s1", status: "scheduled",  score: null, notes: "" },
-  { id: "9",  firstName: "Leila",   lastName: "Hassan",   email: "lhassan@uci.edu",   year: 3, major: "Public Health Policy",         gpa: "3.73", position: "Junior Associate", availableSlots: ["s4"],               assignedSlot: null, status: "rejected",  score: 1,    notes: "No-show." },
-  { id: "10", firstName: "Tyler",   lastName: "Brooks",   email: "tbrooks@uci.edu",   year: 2, major: "Statistics",                   gpa: "3.88", position: "Junior Associate", availableSlots: ["s2","s4"],           assignedSlot: "s2", status: "scheduled",  score: null, notes: "" },
-];
 
 // --- Email templates ---
 
@@ -403,7 +383,7 @@ type StatusTab = (typeof STATUS_TABS)[number]["key"];
 // --- Main page ---
 
 export default function GroupInterviewPage() {
-  const [applicants, setApplicants] = useState<Applicant[]>(MOCK_APPLICANTS);
+  const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<StatusTab>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
