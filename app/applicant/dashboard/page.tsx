@@ -2,7 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { createClient } from "@/utils/supabase/client";
 
 // --- Icons ---
 
@@ -113,7 +115,18 @@ const POSITIONS: Position[] = [
 
 // --- Sidebar ---
 
+function LogOutIcon({ className }: { className?: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <polyline points="16 17 21 12 16 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
 function Sidebar({ active }: { active: NavItem }) {
+  const router = useRouter();
   const navItems: { key: NavItem; label: string; icon: React.ReactNode; href: string }[] = [
     {
       key: "home",
@@ -131,7 +144,7 @@ function Sidebar({ active }: { active: NavItem }) {
       key: "coffee-chats",
       label: "Coffee Chats",
       icon: <UsersIcon />,
-      href: "/applicant/dashboard",
+      href: "/applicant/dashboard/coffee-chats",
     },
   ];
 
@@ -167,17 +180,26 @@ function Sidebar({ active }: { active: NavItem }) {
         </nav>
       </div>
 
-      {/* Bottom: avatar + collapse */}
+      {/* Bottom: avatar + sign out */}
       <div className="flex items-center justify-between w-[208px]">
-        <div className="w-[45px] h-[45px] rounded-full bg-[#061c2a] flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
-          JD
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-[45px] h-[45px] rounded-full bg-[#061c2a] flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+            JD
+          </div>
         </div>
         <button
           type="button"
-          className="text-[#a1a1aa] hover:text-[#374151] transition-colors"
-          aria-label="Collapse sidebar"
+          onClick={async () => {
+            const supabase = createClient();
+            await supabase.auth.signOut();
+            router.push("/applicant/login");
+            router.refresh();
+          }}
+          className="text-[#a1a1aa] hover:text-red-500 transition-colors"
+          aria-label="Sign out"
+          title="Sign out"
         >
-          <PanelLeftCloseIcon />
+          <LogOutIcon />
         </button>
       </div>
     </aside>

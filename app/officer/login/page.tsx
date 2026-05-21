@@ -2,9 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { createClient } from "@/utils/supabase/client";
 
 export default function OfficerLogin() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -16,10 +19,21 @@ export default function OfficerLogin() {
     setError("");
     setLoading(true);
 
-    // TODO: wire up real auth
-    await new Promise((r) => setTimeout(r, 800));
+    const supabase = createClient();
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
     setLoading(false);
-    setError("Invalid credentials. Please try again.");
+
+    if (signInError) {
+      setError(signInError.message);
+      return;
+    }
+
+    router.push("/officer/dashboard");
+    router.refresh();
   }
 
   return (

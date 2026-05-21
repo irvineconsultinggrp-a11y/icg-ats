@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
 
 function HouseIcon({ className }: { className?: string }) {
   return (
@@ -55,12 +56,12 @@ function CheckSquareIcon({ className }: { className?: string }) {
   );
 }
 
-function PanelLeftCloseIcon({ className }: { className?: string }) {
+function LogOutIcon({ className }: { className?: string }) {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
-      <path d="M9 3v18" stroke="currentColor" strokeWidth="2"/>
-      <path d="m16 15-3-3 3-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <polyline points="16 17 21 12 16 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }
@@ -78,6 +79,7 @@ function getActiveNav(pathname: string): OfficerNav {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const active = getActiveNav(pathname);
 
   const navItems: { key: OfficerNav; label: string; icon: React.ReactNode; href: string }[] = [
@@ -122,8 +124,19 @@ export function Sidebar() {
             <p className="text-xs text-[#a1a1aa] truncate">officer@uci.edu</p>
           </div>
         </div>
-        <button type="button" className="text-[#a1a1aa] hover:text-[#374151] transition-colors flex-shrink-0" aria-label="Collapse sidebar">
-          <PanelLeftCloseIcon />
+        <button
+          type="button"
+          onClick={async () => {
+            const supabase = createClient();
+            await supabase.auth.signOut();
+            router.push("/");
+            router.refresh();
+          }}
+          className="text-[#a1a1aa] hover:text-red-500 transition-colors flex-shrink-0"
+          aria-label="Sign out"
+          title="Sign out"
+        >
+          <LogOutIcon />
         </button>
       </div>
     </aside>
