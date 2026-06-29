@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { EmailTemplatesModal, type EmailTemplate } from "../_components/EmailTemplatesModal";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ApplicantStats } from "@/app/api/applicants/stats/route";
+import { fetchApplicantsList } from "@/lib/applicants/stages";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
+import type { ApplicantRow } from "@/lib/types/database";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import {
+  LazyEmailTemplatesModal,
+  type EmailTemplate,
+} from "../_components/LazyEmailTemplatesModal";
 
 // --- Icons ---
 
@@ -66,6 +74,22 @@ type Application = {
   status: AppStatus;
   notes: string;
 };
+
+function rowToApplication(row: ApplicantRow): Application {
+  return {
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    year: row.grad_year ?? 0,
+    major: row.majors ?? "—",
+    gpa: row.gpa ?? "—",
+    position: row.position,
+    submittedAt: new Date(row.created_at).toLocaleDateString(),
+    status: (row.app_status as AppStatus) || "new",
+    notes: row.notes ?? "",
+  };
+}
 
 // --- Status config ---
 
@@ -145,15 +169,25 @@ Irvine Consulting Group | University of California, Irvine`,
 
 function DetailPanel({
   applicant,
+  resumeSignedUrl,
   onClose,
   onUpdate,
+  saveError,
+  saving,
 }: {
   applicant: Application;
+  resumeSignedUrl: string | null;
   onClose: () => void;
   onUpdate: (patch: Partial<Application>) => void;
+  saveError: string;
+  saving: boolean;
 }) {
   const [notes, setNotes] = useState(applicant.notes);
   const initials = `${applicant.firstName[0]}${applicant.lastName[0]}`;
+
+  useEffect(() => {
+    setNotes(applicant.notes);
+  }, [applicant.id, applicant.notes]);
 
   return (
     <div className="w-[380px] flex-shrink-0 border-l border-[#e4e4e7] bg-white flex flex-col h-screen sticky top-0 overflow-y-auto">
@@ -215,12 +249,34 @@ function DetailPanel({
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            onBlur={() => onUpdate({ notes })}
+            onBlur={() => {
+              if (notes !== applicant.notes) {
+                onUpdate({ notes });
+              }
+            }}
             rows={4}
             placeholder="Add notes about this application…"
-            className="w-full border border-[#e4e4e7] rounded-lg px-4 py-3 text-sm text-[#111827] placeholder-[#a1a1aa] outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 transition resize-none"
+            disabled={saving}
+            className="w-full border border-[#e4e4e7] rounded-lg px-4 py-3 text-sm text-[#111827] placeholder-[#a1a1aa] outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 transition resize-none disabled:opacity-60"
           />
+          {saveError && (
+            <p className="text-xs text-red-600">{saveError}</p>
+          )}
+          {saving && (
+            <p className="text-xs text-[#6b7280]">Saving…</p>
+          )}
         </div>
+
+        {resumeSignedUrl && (
+          <a
+            href={resumeSignedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center h-10 w-full border border-[#e4e4e7] rounded-lg text-sm font-medium text-[#061c2a] hover:border-[#061c2a] transition-colors"
+          >
+            View Resume
+          </a>
+        )}
 
         <div className="flex flex-col gap-2 pt-1">
           <button
@@ -255,39 +311,162 @@ const STATUS_TABS = [
 
 type StatusTab = (typeof STATUS_TABS)[number]["key"];
 
+const PAGE_SIZE = 50;
+
 // --- Main page ---
 
 export default function ApplicationsPage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search);
   const [activeTab, setActiveTab] = useState<StatusTab>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [resumeSignedUrl, setResumeSignedUrl] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [statusCounts, setStatusCounts] = useState<ApplicantStats["byStatus"] | null>(null);
 
   const selected = applications.find((a) => a.id === selectedId) ?? null;
 
-  function updateApplication(id: string, patch: Partial<Application>) {
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, activeTab]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/applicants/stats", { credentials: "include" });
+        const body = (await res.json()) as { data?: ApplicantStats };
+        if (res.ok && body.data) {
+          setStatusCounts(body.data.byStatus);
+        }
+      } catch {
+        setStatusCounts(null);
+      }
+    })();
+  }, []);
+
+  const loadApplications = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
+    try {
+      const result = await fetchApplicantsList({
+        search: debouncedSearch,
+        appStatus: activeTab,
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
+      });
+      if (result.error) {
+        setLoadError(result.error);
+        setApplications([]);
+        setTotal(0);
+        return;
+      }
+      setApplications((result.data ?? []).map(rowToApplication));
+      setTotal(result.total ?? 0);
+    } catch {
+      setLoadError("Network error loading applications.");
+      setApplications([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedSearch, activeTab, page]);
+
+  useEffect(() => {
+    void loadApplications();
+  }, [loadApplications]);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setResumeSignedUrl(null);
+      return;
+    }
+    void (async () => {
+      try {
+        const res = await fetch(`/api/applicants/${selectedId}/resume`, {
+          credentials: "include",
+        });
+        const body = (await res.json()) as { resumeSignedUrl?: string | null };
+        if (res.ok) {
+          setResumeSignedUrl(body.resumeSignedUrl ?? null);
+        } else {
+          setResumeSignedUrl(null);
+        }
+      } catch {
+        setResumeSignedUrl(null);
+      }
+    })();
+  }, [selectedId]);
+
+  async function updateApplication(id: string, patch: Partial<Application>) {
+    const previous = applications;
     setApplications((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+
+    const apiPatch: { app_status?: string; notes?: string } = {};
+    if (patch.status !== undefined) apiPatch.app_status = patch.status;
+    if (patch.notes !== undefined) apiPatch.notes = patch.notes;
+    if (Object.keys(apiPatch).length === 0) return;
+
+    setSaving(true);
+    setSaveError("");
+
+    try {
+      const res = await fetch(`/api/applicants/${id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(apiPatch),
+      });
+      const body = (await res.json()) as { data?: ApplicantRow; error?: string };
+      if (!res.ok || !body.data) {
+        setApplications(previous);
+        setSaveError(body.error ?? "Failed to save changes.");
+        return;
+      }
+      setApplications((prev) =>
+        prev.map((a) => (a.id === id ? rowToApplication(body.data!) : a)),
+      );
+    } catch {
+      setApplications(previous);
+      setSaveError("Network error saving changes.");
+    } finally {
+      setSaving(false);
+    }
   }
 
-  const counts: Record<StatusTab, number> = {
-    all:       applications.length,
-    new:       applications.filter((a) => a.status === "new").length,
-    reviewing: applications.filter((a) => a.status === "reviewing").length,
-    advanced:  applications.filter((a) => a.status === "advanced").length,
-    rejected:  applications.filter((a) => a.status === "rejected").length,
-  };
+  const counts: Record<StatusTab, number> = useMemo(() => {
+    if (statusCounts) {
+      return {
+        all:
+          statusCounts.new +
+          statusCounts.reviewing +
+          statusCounts.advanced +
+          statusCounts.rejected,
+        new: statusCounts.new,
+        reviewing: statusCounts.reviewing,
+        advanced: statusCounts.advanced,
+        rejected: statusCounts.rejected,
+      };
+    }
+    return {
+      all: total,
+      new: applications.filter((a) => a.status === "new").length,
+      reviewing: applications.filter((a) => a.status === "reviewing").length,
+      advanced: applications.filter((a) => a.status === "advanced").length,
+      rejected: applications.filter((a) => a.status === "rejected").length,
+    };
+  }, [statusCounts, total, applications]);
 
-  const visible = applications.filter((a) => {
-    const matchesTab = activeTab === "all" || a.status === activeTab;
-    const q = search.toLowerCase();
-    const matchesSearch =
-      !q ||
-      `${a.firstName} ${a.lastName}`.toLowerCase().includes(q) ||
-      a.email.toLowerCase().includes(q) ||
-      a.major.toLowerCase().includes(q);
-    return matchesTab && matchesSearch;
-  });
+  const visible = applications;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const canPrev = page > 0;
+  const canNext = page + 1 < pageCount;
 
   return (
     <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -371,14 +550,20 @@ export default function ApplicationsPage() {
       {/* Table */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <div className="flex-1 overflow-y-auto px-8 py-4">
-          {visible.length === 0 ? (
+            {loading ? (
+              <TableSkeleton rows={10} />
+            ) : loadError ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <p className="text-red-600 font-medium">{loadError}</p>
+              </div>
+            ) : visible.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <FileTextIcon className="text-[#d4d4d8] w-10 h-10 mb-3" />
               <p className="text-[#374151] font-medium">
-                {applications.length === 0 ? "No applications yet" : "No applicants match your filters"}
+                {total === 0 ? "No applications yet" : "No applicants match your filters"}
               </p>
               <p className="text-sm text-[#a1a1aa] mt-1">
-                {applications.length === 0
+                {total === 0
                   ? "Applications will appear here once the recruitment cycle opens."
                   : "Try adjusting your filters or search."}
               </p>
@@ -447,18 +632,47 @@ export default function ApplicationsPage() {
               </table>
             </div>
           )}
+
+          {!loading && !loadError && total > PAGE_SIZE && (
+            <div className="flex items-center justify-between mt-4 px-1">
+              <p className="text-sm text-[#6b7280]">
+                Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!canPrev}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="h-9 px-4 border border-[#e4e4e7] rounded-lg text-sm font-medium text-[#374151] disabled:opacity-40 hover:border-[#061c2a] transition-colors"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={!canNext}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="h-9 px-4 border border-[#e4e4e7] rounded-lg text-sm font-medium text-[#374151] disabled:opacity-40 hover:border-[#061c2a] transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {selected && (
           <DetailPanel
             applicant={selected}
+            resumeSignedUrl={resumeSignedUrl}
             onClose={() => setSelectedId(null)}
-            onUpdate={(patch) => updateApplication(selected.id, patch)}
+            onUpdate={(patch) => void updateApplication(selected.id, patch)}
+            saveError={saveError}
+            saving={saving}
           />
         )}
       </div>
 
-      <EmailTemplatesModal
+      <LazyEmailTemplatesModal
         isOpen={templatesOpen}
         onClose={() => setTemplatesOpen(false)}
         templates={APP_EMAIL_TEMPLATES}

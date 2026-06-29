@@ -1,7 +1,27 @@
 "use client";
 
-import { useState } from "react";
-import { EmailTemplatesModal, type EmailTemplate } from "../_components/EmailTemplatesModal";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  fetchPipelineApplicants,
+  groupInterviewToPatch,
+  patchApplicant,
+  rowToGroupInterview,
+} from "@/lib/applicants/stages";
+import {
+  applicantMatchesSlot,
+  buildSlotId,
+  getGroupInterviewSlot,
+  GROUP_INTERVIEW_DAYS,
+  GROUP_INTERVIEW_SLOTS,
+  type GroupInterviewSlot,
+} from "@/lib/group-interview/sessions";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import {
+  LazyEmailTemplatesModal,
+  type EmailTemplate,
+} from "../_components/LazyEmailTemplatesModal";
+import type { ApplicantStats } from "@/app/api/applicants/stats/route";
 
 // --- Icons ---
 
@@ -62,39 +82,7 @@ function MailIcon({ className }: { className?: string }) {
 
 type GIStatus = "pending" | "scheduled" | "completed" | "rejected";
 
-type Applicant = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  year: number;
-  major: string;
-  gpa: string;
-  position: string;
-  availableSlots: string[];
-  assignedSlot: string | null;
-  status: GIStatus;
-  score: number | null;
-  notes: string;
-};
-
-type Session = {
-  id: string;
-  label: string;
-  date: string;
-  time: string;
-  capacity: number;
-};
-
-// --- Mock data ---
-
-const SESSIONS: Session[] = [
-  { id: "s1", label: "Session A", date: "Oct 3, 2026", time: "10:00 AM – 11:30 AM", capacity: 8 },
-  { id: "s2", label: "Session B", date: "Oct 3, 2026", time: "2:00 PM – 3:30 PM",  capacity: 8 },
-  { id: "s3", label: "Session C", date: "Oct 4, 2026", time: "11:00 AM – 12:30 PM", capacity: 8 },
-  { id: "s4", label: "Session D", date: "Oct 4, 2026", time: "3:00 PM – 4:30 PM",  capacity: 8 },
-];
-
+type Applicant = ReturnType<typeof rowToGroupInterview>;
 
 // --- Email templates ---
 
@@ -227,12 +215,10 @@ function StarRating({ value, onChange }: { value: number | null; onChange: (v: n
 
 function DetailPanel({
   applicant,
-  sessions,
   onClose,
   onUpdate,
 }: {
   applicant: Applicant;
-  sessions: Session[];
   onClose: () => void;
   onUpdate: (updated: Partial<Applicant>) => void;
 }) {
@@ -294,9 +280,9 @@ function DetailPanel({
         </div>
 
         <div className="flex flex-col gap-2">
-          <p className="text-sm font-medium text-[#374151]">Assigned Session</p>
-          <div className="flex flex-col gap-2">
-            {sessions.map((session) => {
+          <p className="text-sm font-medium text-[#374151]">Assigned Slot</p>
+          <div className="flex flex-col gap-2 max-h-[280px] overflow-y-auto">
+            {GROUP_INTERVIEW_SLOTS.map((session) => {
               const isSelected  = applicant.assignedSlot === session.id;
               const isAvailable = applicant.availableSlots.includes(session.id);
               return (
@@ -314,8 +300,8 @@ function DetailPanel({
                   }`}
                 >
                   <div>
-                    <p className={`font-semibold ${isSelected ? "text-[#061c2a]" : "text-[#374151]"}`}>{session.label}</p>
-                    <p className="text-xs text-[#6b7280] mt-0.5">{session.date} · {session.time}</p>
+                    <p className={`font-semibold ${isSelected ? "text-[#061c2a]" : "text-[#374151]"}`}>{session.time}</p>
+                    <p className="text-xs text-[#6b7280] mt-0.5">{session.date}</p>
                   </div>
                   {isAvailable ? (
                     <span className={`text-xs font-medium px-2 py-0.5 rounded ${isSelected ? "bg-[#061c2a] text-white" : "bg-[#f4f4f5] text-[#6b7280]"}`}>
@@ -380,46 +366,195 @@ const STATUS_TABS = [
 
 type StatusTab = (typeof STATUS_TABS)[number]["key"];
 
+type GIStatusCounts = ApplicantStats["giByStatus"];
+
+const PAGE_SIZE = 50;
+
+function SlotCard({
+  slot,
+  selected,
+  assigned,
+  available,
+  onSelect,
+}: {
+  slot: GroupInterviewSlot;
+  selected: boolean;
+  assigned: number;
+  available: number;
+  onSelect: () => void;
+}) {
+  const atCapacity = assigned >= slot.capacity;
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`w-full text-left rounded-lg border px-4 py-3 transition-all ${
+        selected
+          ? "border-[#061c2a] bg-[#061c2a]/5 ring-1 ring-[#061c2a]/20"
+          : "border-[#e4e4e7] bg-white hover:border-[#a1a1aa]"
+      }`}
+    >
+      <p className={`text-sm font-semibold ${selected ? "text-[#061c2a]" : "text-[#111827]"}`}>
+        {slot.time}
+      </p>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="text-xs text-[#6b7280]">
+          {available} available · {assigned} assigned
+        </span>
+        <span
+          className={`text-xs font-medium px-2 py-0.5 rounded ${
+            atCapacity ? "bg-amber-50 text-amber-700" : "bg-[#f4f4f5] text-[#52525b]"
+          }`}
+        >
+          {assigned}/{slot.capacity}
+        </span>
+      </div>
+    </button>
+  );
+}
+
 // --- Main page ---
 
 export default function GroupInterviewPage() {
   const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [allGiApplicants, setAllGiApplicants] = useState<Applicant[]>([]);
+  const [statusCounts, setStatusCounts] = useState<GIStatusCounts | null>(null);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search);
   const [activeTab, setActiveTab] = useState<StatusTab>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sessionFilter, setSessionFilter] = useState<string>("all");
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
 
   const selectedApplicant = applicants.find((a) => a.id === selectedId) ?? null;
 
-  function updateApplicant(id: string, patch: Partial<Applicant>) {
+  useEffect(() => {
+    setPage(0);
+    setSelectedId(null);
+  }, [debouncedSearch, activeTab]);
+
+  const loadStatusCounts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/applicants/stats", { credentials: "include" });
+      const body = (await res.json()) as { data?: ApplicantStats };
+      if (res.ok && body.data?.giByStatus) {
+        setStatusCounts(body.data.giByStatus);
+      }
+    } catch {
+      setStatusCounts(null);
+    }
+  }, []);
+
+  const loadAllForSlots = useCallback(async () => {
+    const result = await fetchPipelineApplicants("group-interview", { limit: 100 });
+    if (!result.error) {
+      setAllGiApplicants((result.data ?? []).map(rowToGroupInterview));
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadStatusCounts();
+    void loadAllForSlots();
+  }, [loadStatusCounts, loadAllForSlots]);
+
+  const loadApplicants = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
+    setApplicants([]);
+    const result = await fetchPipelineApplicants("group-interview", {
+      search: debouncedSearch,
+      giStatus: activeTab,
+      limit: PAGE_SIZE,
+      offset: page * PAGE_SIZE,
+    });
+    if (result.error) {
+      setLoadError(result.error);
+      setApplicants([]);
+      setTotal(0);
+    } else {
+      setApplicants((result.data ?? []).map(rowToGroupInterview));
+      setTotal(result.total ?? 0);
+    }
+    setLoading(false);
+  }, [debouncedSearch, activeTab, page]);
+
+  useEffect(() => {
+    void loadApplicants();
+  }, [loadApplicants]);
+
+  async function updateApplicant(id: string, patch: Partial<Applicant>) {
+    const previous = applicants;
     setApplicants((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+
+    const apiPatch = groupInterviewToPatch(patch);
+    if (Object.keys(apiPatch).length === 0) return;
+
+    setSaveError("");
+    const result = await patchApplicant(id, apiPatch);
+    if (result.error || !result.data) {
+      setApplicants(previous);
+      setSaveError(result.error ?? "Failed to save.");
+      return;
+    }
+    setApplicants((prev) =>
+      prev.map((a) => (a.id === id ? rowToGroupInterview(result.data!) : a)),
+    );
+    void loadStatusCounts();
+    void loadAllForSlots();
   }
 
-  const counts: Record<StatusTab, number> = {
-    all:       applicants.length,
-    pending:   applicants.filter((a) => a.status === "pending").length,
-    scheduled: applicants.filter((a) => a.status === "scheduled").length,
-    completed: applicants.filter((a) => a.status === "completed").length,
-    rejected:  applicants.filter((a) => a.status === "rejected").length,
-  };
+  const counts: Record<StatusTab, number> = useMemo(() => {
+    if (statusCounts) {
+      return {
+        all: statusCounts.total,
+        pending: statusCounts.pending,
+        scheduled: statusCounts.scheduled,
+        completed: statusCounts.completed,
+        rejected: statusCounts.rejected,
+      };
+    }
+    return {
+      all: total,
+      pending: applicants.filter((a) => a.status === "pending").length,
+      scheduled: applicants.filter((a) => a.status === "scheduled").length,
+      completed: applicants.filter((a) => a.status === "completed").length,
+      rejected: applicants.filter((a) => a.status === "rejected").length,
+    };
+  }, [statusCounts, total, applicants]);
 
-  const sessionCounts = SESSIONS.map((s) => ({
-    ...s,
-    assigned: applicants.filter((a) => a.assignedSlot === s.id).length,
-  }));
+  const slotStats = useMemo(() => {
+    const stats = new Map<string, { assigned: number; available: number }>();
+    for (const slot of GROUP_INTERVIEW_SLOTS) {
+      stats.set(slot.id, { assigned: 0, available: 0 });
+    }
+    for (const applicant of allGiApplicants) {
+      for (const slot of GROUP_INTERVIEW_SLOTS) {
+        const entry = stats.get(slot.id)!;
+        if (applicant.assignedSlot === slot.id) entry.assigned += 1;
+        if (applicant.availableSlots.includes(slot.id)) entry.available += 1;
+      }
+    }
+    return stats;
+  }, [allGiApplicants]);
 
-  const visible = applicants.filter((a) => {
-    const matchesTab    = activeTab === "all" || a.status === activeTab;
-    const matchesSession = sessionFilter === "all" || a.assignedSlot === sessionFilter;
-    const q = search.toLowerCase();
-    const matchesSearch =
-      !q ||
-      `${a.firstName} ${a.lastName}`.toLowerCase().includes(q) ||
-      a.email.toLowerCase().includes(q) ||
-      a.major.toLowerCase().includes(q);
-    return matchesTab && matchesSession && matchesSearch;
-  });
+  const visible = useMemo(
+    () =>
+      applicants.filter((a) => {
+        if (sessionFilter === "all") return true;
+        return applicantMatchesSlot(a, sessionFilter);
+      }),
+    [applicants, sessionFilter],
+  );
+
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const canPrev = page > 0;
+  const canNext = page + 1 < pageCount;
 
   return (
     <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -435,7 +570,7 @@ export default function GroupInterviewPage() {
         {/* Title + actions + stats */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-[#061c2a]">Group Interview</h1>
+            <h1 className="text-2xl font-bold text-[#061c2a]">Group Interview Scheduler</h1>
             <p className="text-sm text-[#6b7280] mt-1">Fall 2026 · Junior Associate</p>
           </div>
 
@@ -452,7 +587,7 @@ export default function GroupInterviewPage() {
 
             {/* Stats */}
             {[
-              { label: "Total",     value: applicants.length,  color: "text-[#111827]" },
+              { label: "Total",     value: total,              color: "text-[#111827]" },
               { label: "Pending",   value: counts.pending,     color: "text-amber-600" },
               { label: "Scheduled", value: counts.scheduled,   color: "text-blue-600" },
               { label: "Completed", value: counts.completed,   color: "text-green-600" },
@@ -464,93 +599,131 @@ export default function GroupInterviewPage() {
             ))}
           </div>
         </div>
-
-        {/* Session strip */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          <button
-            type="button"
-            onClick={() => setSessionFilter("all")}
-            className={`flex-shrink-0 h-9 px-4 rounded-full text-sm font-medium border transition-all ${
-              sessionFilter === "all"
-                ? "bg-[#061c2a] text-white border-transparent"
-                : "bg-white text-[#374151] border-[#e4e4e7] hover:border-[#9ca3af]"
-            }`}
-          >
-            All Sessions
-          </button>
-          {sessionCounts.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setSessionFilter(s.id)}
-              className={`flex-shrink-0 flex items-center gap-2 h-9 px-4 rounded-full text-sm font-medium border transition-all ${
-                sessionFilter === s.id
-                  ? "bg-[#061c2a] text-white border-transparent"
-                  : "bg-white text-[#374151] border-[#e4e4e7] hover:border-[#9ca3af]"
-              }`}
-            >
-              <span>{s.label}</span>
-              <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold ${
-                sessionFilter === s.id ? "bg-white/20 text-white" : "bg-[#f4f4f5] text-[#374151]"
-              }`}>
-                {s.assigned}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        {/* Status tabs + search */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-1 border-b border-[#e4e4e7] -mb-px">
-            {STATUS_TABS.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-1.5 h-10 px-4 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === tab.key
-                    ? "border-[#061c2a] text-[#061c2a]"
-                    : "border-transparent text-[#6b7280] hover:text-[#374151]"
-                }`}
-              >
-                {tab.label}
-                <span className={`inline-flex items-center justify-center h-5 min-w-[20px] px-1 rounded-full text-xs font-bold ${
-                  activeTab === tab.key ? "bg-[#061c2a] text-white" : "bg-[#f4f4f5] text-[#6b7280]"
-                }`}>
-                  {counts[tab.key]}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          <div className="relative flex-shrink-0 w-[260px]">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search applicants…"
-              className="h-9 w-full border border-[#d4d4d8] rounded-lg px-4 pr-10 text-sm text-[#111827] placeholder-[#a1a1aa] outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 transition"
-            />
-            <SearchIcon className="absolute right-3 top-1/2 -translate-y-1/2 text-[#a1a1aa]" />
-          </div>
-        </div>
       </div>
 
-      {/* Table area */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 overflow-y-auto px-8 py-4">
-          {visible.length === 0 ? (
+      {/* Scheduler: slot panel + applicant table */}
+      <div className="flex flex-1 min-h-0 overflow-hidden border-t border-[#e4e4e7]">
+        <aside className="w-[340px] flex-shrink-0 border-r border-[#e4e4e7] bg-[#fafafa] overflow-y-auto px-5 py-6">
+          <h2 className="text-base font-semibold text-[#111827] mb-4">Interview Slots</h2>
+          <div className="flex flex-col gap-6">
+            {GROUP_INTERVIEW_DAYS.map((day) => (
+              <div key={day.date} className="flex flex-col gap-2">
+                <p className="text-sm text-[#52525b]">{day.date}</p>
+                <div className="flex flex-col gap-2">
+                  {day.slots.map((time) => {
+                    const slot = getGroupInterviewSlot(buildSlotId(day.date, time))!;
+                    const stats = slotStats.get(slot.id) ?? { assigned: 0, available: 0 };
+                    return (
+                      <SlotCard
+                        key={slot.id}
+                        slot={slot}
+                        selected={sessionFilter === slot.id}
+                        assigned={stats.assigned}
+                        available={stats.available}
+                        onSelect={() =>
+                          setSessionFilter((current) =>
+                            current === slot.id ? "all" : slot.id,
+                          )
+                        }
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
+          <div className="px-6 pt-5 pb-0 flex flex-col gap-4">
+            {saveError && (
+              <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {saveError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-1 border-b border-[#e4e4e7] -mb-px">
+                {STATUS_TABS.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => {
+                      if (tab.key !== activeTab) setActiveTab(tab.key);
+                    }}
+                    className={`flex items-center gap-1.5 h-10 px-4 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === tab.key
+                        ? "border-[#061c2a] text-[#061c2a]"
+                        : "border-transparent text-[#6b7280] hover:text-[#374151]"
+                    }`}
+                  >
+                    {tab.label}
+                    <span className={`inline-flex items-center justify-center h-5 min-w-[20px] px-1 rounded-full text-xs font-bold ${
+                      activeTab === tab.key ? "bg-[#061c2a] text-white" : "bg-[#f4f4f5] text-[#6b7280]"
+                    }`}>
+                      {counts[tab.key]}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative flex-shrink-0 w-[260px]">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search applicants…"
+                  className="h-9 w-full border border-[#d4d4d8] rounded-lg px-4 pr-10 text-sm text-[#111827] placeholder-[#a1a1aa] outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 transition"
+                />
+                <SearchIcon className="absolute right-3 top-1/2 -translate-y-1/2 text-[#a1a1aa]" />
+              </div>
+            </div>
+
+            {sessionFilter !== "all" && (
+              <div className="flex items-center gap-2 text-sm text-[#52525b]">
+                <span>Showing applicants for</span>
+                <span className="font-medium text-[#111827]">
+                  {getGroupInterviewSlot(sessionFilter)?.time}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSessionFilter("all")}
+                  className="text-[#061c2a] font-medium hover:underline"
+                >
+                  Clear filter
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-1 min-h-0 overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-6 py-4" key={`gi-table-${activeTab}-${sessionFilter}`}>
+            {loading ? (
+              <TableSkeleton rows={10} />
+            ) : loadError ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <p className="text-red-600 font-medium">{loadError}</p>
+            </div>
+          ) : visible.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <UsersIcon className="text-[#d4d4d8] w-10 h-10 mb-3" />
-              <p className="text-[#374151] font-medium">No applicants found</p>
-              <p className="text-sm text-[#a1a1aa] mt-1">Try adjusting your filters or search.</p>
+              <p className="text-[#374151] font-medium">
+                {total === 0
+                  ? "No applicants in group interview yet"
+                  : "No applicants match your filters"}
+              </p>
+              <p className="text-sm text-[#a1a1aa] mt-1">
+                {total === 0
+                  ? "Advance applicants from the Applications page to add them here."
+                  : "Try adjusting your filters or search."}
+              </p>
             </div>
           ) : (
             <div className="border border-[#e4e4e7] rounded-xl overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-[#f9fafb] border-b border-[#e4e4e7]">
                   <tr>
-                    {["Applicant", "Year / Major", "Session", "Status", "Score", ""].map((h) => (
+                    {["Applicant", "Year / Major", "Slot", "Status", "Score", ""].map((h) => (
                       <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-[#6b7280] uppercase tracking-wide whitespace-nowrap">
                         {h}
                       </th>
@@ -560,7 +733,7 @@ export default function GroupInterviewPage() {
                 <tbody className="divide-y divide-[#f4f4f5]">
                   {visible.map((applicant) => {
                     const initials  = `${applicant.firstName[0]}${applicant.lastName[0]}`;
-                    const session   = SESSIONS.find((s) => s.id === applicant.assignedSlot);
+                    const session   = getGroupInterviewSlot(applicant.assignedSlot);
                     const isSelected = selectedId === applicant.id;
 
                     return (
@@ -587,7 +760,7 @@ export default function GroupInterviewPage() {
                         <td className="px-5 py-4">
                           {session ? (
                             <div>
-                              <p className="font-medium text-[#374151]">{session.label}</p>
+                              <p className="font-medium text-[#374151]">{session.time}</p>
                               <p className="text-xs text-[#6b7280] mt-0.5">{session.date}</p>
                             </div>
                           ) : (
@@ -625,19 +798,46 @@ export default function GroupInterviewPage() {
               </table>
             </div>
           )}
-        </div>
 
-        {selectedApplicant && (
-          <DetailPanel
-            applicant={selectedApplicant}
-            sessions={SESSIONS}
-            onClose={() => setSelectedId(null)}
-            onUpdate={(patch) => updateApplicant(selectedApplicant.id, patch)}
-          />
-        )}
+          {!loading && !loadError && total > PAGE_SIZE && (
+            <div className="flex items-center justify-between mt-4 px-1 pb-4">
+              <p className="text-sm text-[#6b7280]">
+                Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!canPrev}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="h-9 px-4 border border-[#e4e4e7] rounded-lg text-sm font-medium text-[#374151] disabled:opacity-40 hover:border-[#061c2a] transition-colors"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={!canNext}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="h-9 px-4 border border-[#e4e4e7] rounded-lg text-sm font-medium text-[#374151] disabled:opacity-40 hover:border-[#061c2a] transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+            </div>
+
+            {selectedApplicant && (
+              <DetailPanel
+                applicant={selectedApplicant}
+                onClose={() => setSelectedId(null)}
+                onUpdate={(patch) => updateApplicant(selectedApplicant.id, patch)}
+              />
+            )}
+          </div>
+        </div>
       </div>
 
-      <EmailTemplatesModal
+      <LazyEmailTemplatesModal
         isOpen={templatesOpen}
         onClose={() => setTemplatesOpen(false)}
         templates={GI_EMAIL_TEMPLATES}

@@ -1,0 +1,9 @@
+# Supabase local dev config — see https://supabase.com/docs/guides/cli/config
+
+project_id = "icgats"
+
+[api]
+enabled = true
+
+[db]
+major_version = 17

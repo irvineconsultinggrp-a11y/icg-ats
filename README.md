@@ -1,5 +1,12 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Supabase setup (applications & resumes)
+
+1. Copy [`.env.example`](.env.example) to `.env.local` and fill in values from your [Supabase project](https://supabase.com/dashboard).
+2. Run the SQL in [`supabase/migrations`](supabase/migrations) in the Supabase SQL editor (in order).
+3. Set **`app_metadata.role`** to `officer` for officer accounts (Dashboard → Authentication → Users). Applicant accounts get `applicant` automatically on signup/login.
+4. `SUPABASE_SERVICE_ROLE_KEY` is required for resume uploads and role assignment — keep it server-only.
+
 ## Getting Started
 
 First, run the development server:

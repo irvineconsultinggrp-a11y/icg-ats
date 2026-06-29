@@ -1,7 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { EmailTemplatesModal, type EmailTemplate } from "../_components/EmailTemplatesModal";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  decisionToPatch,
+  fetchPipelineApplicants,
+  patchApplicant,
+  rowToDecision,
+} from "@/lib/applicants/stages";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import {
+  LazyEmailTemplatesModal,
+  type EmailTemplate,
+} from "../_components/LazyEmailTemplatesModal";
 
 // --- Icons ---
 
@@ -61,19 +72,7 @@ function StarIcon({ filled, className }: { filled: boolean; className?: string }
 
 type DecisionStatus = "pending" | "accepted" | "rejected";
 
-type Decision = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  year: number;
-  major: string;
-  gpa: string;
-  giScore: number | null;
-  ccScore: number | null;
-  status: DecisionStatus;
-  notes: string;
-};
+type Decision = ReturnType<typeof rowToDecision>;
 
 // --- Status config ---
 
@@ -297,38 +296,86 @@ const STATUS_TABS = [
 
 type StatusTab = (typeof STATUS_TABS)[number]["key"];
 
+const PAGE_SIZE = 50;
+
 // --- Main page ---
 
 export default function DecisionsPage() {
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search);
   const [activeTab, setActiveTab] = useState<StatusTab>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
 
   const selected = decisions.find((d) => d.id === selectedId) ?? null;
 
-  function updateDecision(id: string, patch: Partial<Decision>) {
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, activeTab]);
+
+  const loadDecisions = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
+    const result = await fetchPipelineApplicants("decisions", {
+      search: debouncedSearch,
+      decisionStatus: activeTab,
+      limit: PAGE_SIZE,
+      offset: page * PAGE_SIZE,
+    });
+    if (result.error) {
+      setLoadError(result.error);
+      setDecisions([]);
+      setTotal(0);
+    } else {
+      setDecisions((result.data ?? []).map(rowToDecision));
+      setTotal(result.total ?? 0);
+    }
+    setLoading(false);
+  }, [debouncedSearch, activeTab, page]);
+
+  useEffect(() => {
+    void loadDecisions();
+  }, [loadDecisions]);
+
+  async function updateDecision(id: string, patch: Partial<Decision>) {
+    const previous = decisions;
     setDecisions((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+
+    const apiPatch = decisionToPatch(patch);
+    if (Object.keys(apiPatch).length === 0) return;
+
+    setSaveError("");
+    const result = await patchApplicant(id, apiPatch);
+    if (result.error || !result.data) {
+      setDecisions(previous);
+      setSaveError(result.error ?? "Failed to save.");
+      return;
+    }
+    setDecisions((prev) =>
+      prev.map((d) => (d.id === id ? rowToDecision(result.data!) : d)),
+    );
   }
 
-  const counts: Record<StatusTab, number> = {
-    all:      decisions.length,
-    pending:  decisions.filter((d) => d.status === "pending").length,
-    accepted: decisions.filter((d) => d.status === "accepted").length,
-    rejected: decisions.filter((d) => d.status === "rejected").length,
-  };
+  const counts: Record<StatusTab, number> = useMemo(
+    () => ({
+      all: total,
+      pending: decisions.filter((d) => d.status === "pending").length,
+      accepted: decisions.filter((d) => d.status === "accepted").length,
+      rejected: decisions.filter((d) => d.status === "rejected").length,
+    }),
+    [total, decisions],
+  );
 
-  const visible = decisions.filter((d) => {
-    const matchesTab = activeTab === "all" || d.status === activeTab;
-    const q = search.toLowerCase();
-    const matchesSearch =
-      !q ||
-      `${d.firstName} ${d.lastName}`.toLowerCase().includes(q) ||
-      d.email.toLowerCase().includes(q) ||
-      d.major.toLowerCase().includes(q);
-    return matchesTab && matchesSearch;
-  });
+  const visible = decisions;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const canPrev = page > 0;
+  const canNext = page + 1 < pageCount;
 
   return (
     <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -409,14 +456,20 @@ export default function DecisionsPage() {
       {/* Table */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <div className="flex-1 overflow-y-auto px-8 py-4">
-          {visible.length === 0 ? (
+            {loading ? (
+              <TableSkeleton rows={10} />
+            ) : loadError ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <p className="text-red-600 font-medium">{loadError}</p>
+            </div>
+          ) : visible.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <CheckSquareIcon className="text-[#d4d4d8] w-10 h-10 mb-3" />
               <p className="text-[#374151] font-medium">
-                {decisions.length === 0 ? "No decisions yet" : "No applicants match your filters"}
+                {total === 0 ? "No decisions yet" : "No applicants match your filters"}
               </p>
               <p className="text-sm text-[#a1a1aa] mt-1">
-                {decisions.length === 0
+                {total === 0
                   ? "Applicants who complete Coffee Chats will appear here for a final decision."
                   : "Try adjusting your filters or search."}
               </p>
@@ -501,6 +554,32 @@ export default function DecisionsPage() {
               </table>
             </div>
           )}
+
+          {!loading && !loadError && total > PAGE_SIZE && (
+            <div className="flex items-center justify-between mt-4 px-1">
+              <p className="text-sm text-[#6b7280]">
+                Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!canPrev}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="h-9 px-4 border border-[#e4e4e7] rounded-lg text-sm font-medium text-[#374151] disabled:opacity-40 hover:border-[#061c2a] transition-colors"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={!canNext}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="h-9 px-4 border border-[#e4e4e7] rounded-lg text-sm font-medium text-[#374151] disabled:opacity-40 hover:border-[#061c2a] transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {selected && (
@@ -512,7 +591,7 @@ export default function DecisionsPage() {
         )}
       </div>
 
-      <EmailTemplatesModal
+      <LazyEmailTemplatesModal
         isOpen={templatesOpen}
         onClose={() => setTemplatesOpen(false)}
         templates={DECISION_EMAIL_TEMPLATES}

@@ -25,12 +25,21 @@ export default function OfficerLogin() {
       password,
     });
 
-    setLoading(false);
-
     if (signInError) {
+      setLoading(false);
       setError(signInError.message);
       return;
     }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.app_metadata?.role !== "officer") {
+      await supabase.auth.signOut();
+      setLoading(false);
+      setError("This account does not have officer access. Contact your admin to get officer role assigned.");
+      return;
+    }
+
+    setLoading(false);
 
     router.push("/officer/dashboard");
     router.refresh();

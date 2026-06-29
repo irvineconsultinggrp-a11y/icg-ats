@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { OAuthButtons } from "@/components/applicant/oauth-buttons";
-import { signUpWithPassword } from "@/utils/auth/applicant";
+import { APPLICANT_EMAIL_ERROR, isApplicantEmailAllowed } from "@/lib/auth/applicant-email";
+import { ensureApplicantRole, signUpWithPassword } from "@/utils/auth/applicant";
 
 export default function ApplicantSignup() {
   const router = useRouter();
@@ -35,6 +36,11 @@ export default function ApplicantSignup() {
       return;
     }
 
+    if (!isApplicantEmailAllowed(email)) {
+      setError(APPLICANT_EMAIL_ERROR);
+      return;
+    }
+
     setLoading(true);
     const { error: signUpError, data } = await signUpWithPassword(email, password, {
       firstName,
@@ -50,6 +56,7 @@ export default function ApplicantSignup() {
     // Supabase returns a session immediately when email confirmation is disabled,
     // otherwise data.session is null and we show the confirm-email message.
     if (data.session) {
+      await ensureApplicantRole();
       router.push("/applicant/dashboard");
       router.refresh();
     } else {

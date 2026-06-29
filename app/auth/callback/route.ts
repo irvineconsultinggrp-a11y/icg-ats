@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import {
+  APPLICANT_EMAIL_ERROR,
+  isApplicantEmailAllowed,
+} from "@/lib/auth/applicant-email";
 import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -9,8 +14,7 @@ export async function GET(request: Request) {
   const intent = searchParams.get("intent");
 
   if (!code) {
-    const loginPath = intent === "applicant" ? "/applicant/login" : "/applicant/login";
-    return NextResponse.redirect(`${origin}${loginPath}?error=auth`);
+    return NextResponse.redirect(`${origin}/applicant/login?error=auth`);
   }
 
   const cookieStore = await cookies();
@@ -21,11 +25,23 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/applicant/login?error=auth`);
   }
 
-  // Tag OAuth sign-ups with the applicant role if not already set
   if (intent === "applicant") {
     const { data: { user } } = await supabase.auth.getUser();
-    if (user && !user.user_metadata?.role) {
-      await supabase.auth.updateUser({ data: { role: "applicant" } });
+    if (user?.email && !isApplicantEmailAllowed(user.email)) {
+      await supabase.auth.signOut();
+      return NextResponse.redirect(
+        `${origin}/applicant/login?error=email_domain`,
+      );
+    }
+    if (user && user.app_metadata?.role !== "applicant" && user.app_metadata?.role !== "officer") {
+      try {
+        const admin = createAdminClient();
+        await admin.auth.admin.updateUserById(user.id, {
+          app_metadata: { ...user.app_metadata, role: "applicant" },
+        });
+      } catch (e) {
+        console.error("[auth/callback ensure-role]", e);
+      }
     }
   }
 

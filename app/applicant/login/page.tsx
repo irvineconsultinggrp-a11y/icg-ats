@@ -3,9 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { OAuthButtons } from "@/components/applicant/oauth-buttons";
-import { APPLICANT_DASHBOARD, signInWithPassword } from "@/utils/auth/applicant";
+import { APPLICANT_EMAIL_ERROR, isApplicantEmailAllowed } from "@/lib/auth/applicant-email";
+import { APPLICANT_DASHBOARD, ensureApplicantRole, signInWithPassword } from "@/utils/auth/applicant";
+import { createClient } from "@/utils/supabase/client";
 
 function ApplicantLoginForm() {
   const router = useRouter();
@@ -15,17 +17,68 @@ function ApplicantLoginForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>(() =>
-    searchParams.get("error") === "auth" ? "Sign in failed. Please try again." : ""
-  );
+  const [error, setError] = useState<string>(() => {
+    if (searchParams.get("error") === "auth") return "Sign in failed. Please try again.";
+    if (searchParams.get("error") === "role") {
+      return "Your account does not have applicant access. Sign in with an applicant account or create one.";
+    }
+    if (searchParams.get("error") === "email_domain") {
+      return APPLICANT_EMAIL_ERROR;
+    }
+    return "";
+  });
   const [success] = useState<string>(() =>
     searchParams.get("confirmed") === "1" ? "Email confirmed! You can sign in now." : ""
   );
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    async function checkSession() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setCheckingSession(false);
+        return;
+      }
+
+      const role = user.app_metadata?.role;
+      if (role === "applicant") {
+        router.replace(searchParams.get("next")?.startsWith("/applicant/")
+          ? searchParams.get("next")!
+          : APPLICANT_DASHBOARD);
+        return;
+      }
+
+      if (role === "officer") {
+        setError("You are signed in as an officer. Sign out first to use the applicant portal.");
+        setCheckingSession(false);
+        return;
+      }
+
+      const ok = await ensureApplicantRole();
+      if (ok) {
+        router.replace(searchParams.get("next")?.startsWith("/applicant/")
+          ? searchParams.get("next")!
+          : APPLICANT_DASHBOARD);
+        return;
+      }
+
+      setCheckingSession(false);
+    }
+
+    void checkSession();
+  }, [router, searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
+
+    if (!isApplicantEmailAllowed(email)) {
+      setError(APPLICANT_EMAIL_ERROR);
+      setLoading(false);
+      return;
+    }
 
     const { error: signInError } = await signInWithPassword(email, password);
     setLoading(false);
@@ -35,12 +88,24 @@ function ApplicantLoginForm() {
       return;
     }
 
+    const roleOk = await ensureApplicantRole();
+    if (!roleOk) {
+      setError("Your account does not have applicant access.");
+      return;
+    }
+
     const next = searchParams.get("next");
     router.push(next?.startsWith("/applicant/") ? next : APPLICANT_DASHBOARD);
     router.refresh();
   }
 
   return (
+    <>
+      {checkingSession ? (
+        <div className="w-full h-48 flex items-center justify-center text-[#a1a1aa]">
+          Loading…
+        </div>
+      ) : (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5 w-full">
       {/* Email */}
       <div className="flex flex-col gap-1.5">
@@ -163,6 +228,8 @@ function ApplicantLoginForm() {
         </Link>
       </p>
     </form>
+      )}
+    </>
   );
 }
 

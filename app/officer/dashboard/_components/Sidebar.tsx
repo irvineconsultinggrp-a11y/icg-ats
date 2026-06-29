@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 
 function HouseIcon({ className }: { className?: string }) {
@@ -81,6 +82,32 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const active = getActiveNav(pathname);
+  const [displayName, setDisplayName] = useState("Officer");
+  const [email, setEmail] = useState("");
+  const [initials, setInitials] = useState("O");
+
+  useEffect(() => {
+    void (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const addr = user.email ?? "";
+      setEmail(addr);
+      const local = addr.split("@")[0] ?? "officer";
+      const parts = local.replace(/[._-]/g, " ").split(/\s+/).filter(Boolean);
+      const name =
+        (user.user_metadata?.full_name as string | undefined) ??
+        (parts.length >= 2
+          ? `${parts[0]} ${parts[parts.length - 1]}`
+          : parts[0] ?? "Officer");
+      setDisplayName(name);
+      const ini =
+        parts.length >= 2
+          ? `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase()
+          : (parts[0]?.slice(0, 2) ?? "O").toUpperCase();
+      setInitials(ini);
+    })();
+  }, []);
 
   const navItems: { key: OfficerNav; label: string; icon: React.ReactNode; href: string }[] = [
     { key: "home",            label: "Home",            icon: <HouseIcon />,       href: "/officer/dashboard" },
@@ -117,11 +144,11 @@ export function Sidebar() {
       <div className="flex items-center justify-between w-[208px]">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-[40px] h-[40px] rounded-full bg-[#061c2a] flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
-            OA
+            {initials}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-[#111827] truncate">Officer Account</p>
-            <p className="text-xs text-[#a1a1aa] truncate">officer@uci.edu</p>
+            <p className="text-sm font-semibold text-[#111827] truncate">{displayName}</p>
+            <p className="text-xs text-[#a1a1aa] truncate">{email || "Signed in"}</p>
           </div>
         </div>
         <button

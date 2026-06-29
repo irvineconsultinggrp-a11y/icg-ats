@@ -1,7 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { EmailTemplatesModal, type EmailTemplate } from "../_components/EmailTemplatesModal";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  coffeeChatToPatch,
+  fetchPipelineApplicants,
+  patchApplicant,
+  rowToCoffeeChat,
+} from "@/lib/applicants/stages";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import {
+  LazyEmailTemplatesModal,
+  type EmailTemplate,
+} from "../_components/LazyEmailTemplatesModal";
+import type { ApplicantStats } from "@/app/api/applicants/stats/route";
+import { getDefaultCoffeeChatCalendlyUrl } from "@/lib/calendly";
 
 // --- Icons ---
 
@@ -89,21 +102,7 @@ function ChevronDownIcon({ className }: { className?: string }) {
 
 type CCStatus = "pending" | "scheduled" | "completed" | "rejected";
 
-type CoffeeChat = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  year: number;
-  major: string;
-  gpa: string;
-  scheduledDate: string | null;
-  scheduledTime: string | null;
-  assignedOfficer: string | null;
-  status: CCStatus;
-  score: number | null;
-  notes: string;
-};
+type CoffeeChat = ReturnType<typeof rowToCoffeeChat>;
 
 // --- Status config ---
 
@@ -352,19 +351,22 @@ function DetailPanel({
         {/* Notes */}
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-[#374151]">Officer Notes</p>
+            <p className="text-sm font-semibold text-[#111827]">Coffee Chat Notes</p>
             <span className={`text-xs text-green-600 font-medium flex items-center gap-1 transition-opacity duration-300 ${savedFlash ? "opacity-100" : "opacity-0"}`}>
               <CheckCircleIcon className="w-3 h-3" />
               Saved
             </span>
           </div>
+          <p className="text-xs text-[#6b7280]">
+            Track impressions, strengths, and follow-ups from the conversation.
+          </p>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             onBlur={() => { onUpdate({ notes }); triggerSaved(); }}
-            rows={4}
-            placeholder="Add notes from the coffee chat…"
-            className="w-full border border-[#e4e4e7] rounded-lg px-4 py-3 text-sm text-[#111827] placeholder-[#a1a1aa] outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 transition resize-none"
+            rows={8}
+            placeholder="What stood out? Any concerns? Recommended next steps…"
+            className="w-full border border-[#e4e4e7] rounded-lg px-4 py-3 text-sm text-[#111827] placeholder-[#a1a1aa] outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 transition resize-none min-h-[160px]"
           />
         </div>
 
@@ -403,21 +405,95 @@ const STATUS_TABS = [
 
 type StatusTab = (typeof STATUS_TABS)[number]["key"];
 
+type CCStatusCounts = ApplicantStats["ccByStatus"];
+
+const PAGE_SIZE = 50;
+
 // --- Main page ---
 
 export default function CoffeeChatsPage() {
   const [chats, setChats] = useState<CoffeeChat[]>([]);
+  const [statusCounts, setStatusCounts] = useState<CCStatusCounts | null>(null);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search);
   const [activeTab, setActiveTab] = useState<StatusTab>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [sortBy, setSortBy] = useState<"name" | "status" | "score" | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
+  const calendlyUrl = getDefaultCoffeeChatCalendlyUrl();
 
   const selected = chats.find((c) => c.id === selectedId) ?? null;
 
-  function updateChat(id: string, patch: Partial<CoffeeChat>) {
+  useEffect(() => {
+    setPage(0);
+    setSelectedId(null);
+  }, [debouncedSearch, activeTab]);
+
+  const loadStatusCounts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/applicants/stats", { credentials: "include" });
+      const body = (await res.json()) as { data?: ApplicantStats };
+      if (res.ok && body.data?.ccByStatus) {
+        setStatusCounts(body.data.ccByStatus);
+      }
+    } catch {
+      setStatusCounts(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadStatusCounts();
+  }, [loadStatusCounts]);
+
+  const loadChats = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
+    setChats([]);
+    const result = await fetchPipelineApplicants("coffee-chats", {
+      search: debouncedSearch,
+      ccStatus: activeTab,
+      limit: PAGE_SIZE,
+      offset: page * PAGE_SIZE,
+    });
+    if (result.error) {
+      setLoadError(result.error);
+      setChats([]);
+      setTotal(0);
+    } else {
+      setChats((result.data ?? []).map(rowToCoffeeChat));
+      setTotal(result.total ?? 0);
+    }
+    setLoading(false);
+  }, [debouncedSearch, activeTab, page]);
+
+  useEffect(() => {
+    void loadChats();
+  }, [loadChats]);
+
+  async function updateChat(id: string, patch: Partial<CoffeeChat>) {
+    const previous = chats;
     setChats((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+
+    const apiPatch = coffeeChatToPatch(patch);
+    if (Object.keys(apiPatch).length === 0) return;
+
+    setSaveError("");
+    const result = await patchApplicant(id, apiPatch);
+    if (result.error || !result.data) {
+      setChats(previous);
+      setSaveError(result.error ?? "Failed to save.");
+      return;
+    }
+    setChats((prev) =>
+      prev.map((c) => (c.id === id ? rowToCoffeeChat(result.data!) : c)),
+    );
+    void loadStatusCounts();
   }
 
   function handleSort(col: "name" | "status" | "score") {
@@ -429,33 +505,45 @@ export default function CoffeeChatsPage() {
     }
   }
 
-  const counts: Record<StatusTab, number> = {
-    all:       chats.length,
-    pending:   chats.filter((c) => c.status === "pending").length,
-    scheduled: chats.filter((c) => c.status === "scheduled").length,
-    completed: chats.filter((c) => c.status === "completed").length,
-    rejected:  chats.filter((c) => c.status === "rejected").length,
-  };
+  const counts: Record<StatusTab, number> = useMemo(() => {
+    if (statusCounts) {
+      return {
+        all: statusCounts.total,
+        pending: statusCounts.pending,
+        scheduled: statusCounts.scheduled,
+        completed: statusCounts.completed,
+        rejected: statusCounts.rejected,
+      };
+    }
+    return {
+      all: total,
+      pending: chats.filter((c) => c.status === "pending").length,
+      scheduled: chats.filter((c) => c.status === "scheduled").length,
+      completed: chats.filter((c) => c.status === "completed").length,
+      rejected: chats.filter((c) => c.status === "rejected").length,
+    };
+  }, [statusCounts, total, chats]);
 
-  const visible = chats
-    .filter((c) => {
-      const matchesTab = activeTab === "all" || c.status === activeTab;
-      const q = search.toLowerCase();
-      const matchesSearch =
-        !q ||
-        `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q) ||
-        c.major.toLowerCase().includes(q);
-      return matchesTab && matchesSearch;
-    })
-    .sort((a, b) => {
-      if (!sortBy) return 0;
-      let cmp = 0;
-      if (sortBy === "name") cmp = `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
-      else if (sortBy === "status") cmp = a.status.localeCompare(b.status);
-      else if (sortBy === "score") cmp = (a.score ?? -1) - (b.score ?? -1);
-      return sortDir === "asc" ? cmp : -cmp;
-    });
+  const visible = useMemo(
+    () =>
+      [...chats].sort((a, b) => {
+        if (!sortBy) return 0;
+        let cmp = 0;
+        if (sortBy === "name") {
+          cmp = `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
+        } else if (sortBy === "status") {
+          cmp = a.status.localeCompare(b.status);
+        } else if (sortBy === "score") {
+          cmp = (a.score ?? -1) - (b.score ?? -1);
+        }
+        return sortDir === "asc" ? cmp : -cmp;
+      }),
+    [chats, sortBy, sortDir],
+  );
+
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const canPrev = page > 0;
+  const canNext = page + 1 < pageCount;
 
   return (
     <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -497,13 +585,38 @@ export default function CoffeeChatsPage() {
           </div>
         </div>
 
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-[#e4e4e7] bg-[#fafafa] px-5 py-4">
+          <div>
+            <p className="text-sm font-semibold text-[#111827]">Scheduling via Calendly</p>
+            <p className="text-xs text-[#6b7280] mt-0.5">
+              Applicants book through Calendly. Use the notes panel when reviewing each chat.
+            </p>
+          </div>
+          {calendlyUrl ? (
+            <a
+              href={calendlyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 h-9 px-4 bg-[#061c2a] text-white text-sm font-medium rounded-lg hover:bg-[#0d2f47] transition-colors flex-shrink-0"
+            >
+              Open Calendly
+            </a>
+          ) : (
+            <span className="text-xs text-[#a1a1aa] italic flex-shrink-0">
+              Add NEXT_PUBLIC_COFFEE_CHAT_CALENDLY_URL to enable
+            </span>
+          )}
+        </div>
+
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-1 border-b border-[#e4e4e7] -mb-px">
             {STATUS_TABS.map((tab) => (
               <button
                 key={tab.key}
                 type="button"
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => {
+                  if (tab.key !== activeTab) setActiveTab(tab.key);
+                }}
                 className={`flex items-center gap-1.5 h-10 px-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === tab.key
                     ? "border-[#061c2a] text-[#061c2a]"
@@ -535,15 +648,21 @@ export default function CoffeeChatsPage() {
 
       {/* Table */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 overflow-y-auto px-8 py-4">
-          {visible.length === 0 ? (
+        <div className="flex-1 overflow-y-auto px-8 py-4" key={`cc-table-${activeTab}`}>
+          {loading ? (
+            <TableSkeleton rows={10} />
+          ) : loadError ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <p className="text-red-600 font-medium">{loadError}</p>
+            </div>
+          ) : visible.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <CoffeeIcon className="text-[#d4d4d8] w-10 h-10 mb-3" />
               <p className="text-[#374151] font-medium">
-                {chats.length === 0 ? "No coffee chats yet" : "No applicants match your filters"}
+                {total === 0 ? "No coffee chats yet" : "No applicants match your filters"}
               </p>
               <p className="text-sm text-[#a1a1aa] mt-1">
-                {chats.length === 0
+                  {total === 0
                   ? "Applicants who pass the Group Interview will appear here."
                   : "Try adjusting your filters or search."}
               </p>
@@ -559,6 +678,7 @@ export default function CoffeeChatsPage() {
                       { label: "Scheduled",    sort: null },
                       { label: "Officer",      sort: null },
                       { label: "Status",       sort: "status" as const },
+                      { label: "Notes",        sort: null },
                       { label: "Score",        sort: "score"  as const },
                       { label: "",             sort: null },
                     ] as { label: string; sort: "name" | "status" | "score" | null }[]).map(({ label, sort }) => (
@@ -625,6 +745,13 @@ export default function CoffeeChatsPage() {
                         <td className="px-5 py-4">
                           <StatusBadge status={chat.status} />
                         </td>
+                        <td className="px-5 py-4 max-w-[200px]">
+                          {chat.notes?.trim() ? (
+                            <p className="text-xs text-[#374151] line-clamp-2">{chat.notes}</p>
+                          ) : (
+                            <span className="text-xs text-[#a1a1aa] italic">No notes yet</span>
+                          )}
+                        </td>
                         <td className="px-5 py-4">
                           {chat.score !== null ? (
                             <div className="flex items-center gap-1">
@@ -653,6 +780,32 @@ export default function CoffeeChatsPage() {
               </table>
             </div>
           )}
+
+          {!loading && !loadError && total > PAGE_SIZE && (
+            <div className="flex items-center justify-between mt-4 px-1">
+              <p className="text-sm text-[#6b7280]">
+                Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!canPrev}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="h-9 px-4 border border-[#e4e4e7] rounded-lg text-sm font-medium text-[#374151] disabled:opacity-40 hover:border-[#061c2a] transition-colors"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={!canNext}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="h-9 px-4 border border-[#e4e4e7] rounded-lg text-sm font-medium text-[#374151] disabled:opacity-40 hover:border-[#061c2a] transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {selected && (
@@ -664,7 +817,7 @@ export default function CoffeeChatsPage() {
         )}
       </div>
 
-      <EmailTemplatesModal
+      <LazyEmailTemplatesModal
         isOpen={templatesOpen}
         onClose={() => setTemplatesOpen(false)}
         templates={CC_EMAIL_TEMPLATES}

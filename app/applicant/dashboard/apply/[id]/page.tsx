@@ -1,48 +1,14 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { useState, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useState, useRef, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { hydrateFormFromRow } from "@/lib/applicants/form";
+import { buildSlotId, GROUP_INTERVIEW_DAYS } from "@/lib/group-interview/sessions";
+import { canApplyToPosition, formatPositionTitle, getPositionById } from "@/lib/positions";
+import type { ApplicantRow } from "@/lib/types/database";
 
 // --- Icons ---
-
-function HouseIcon({ className }: { className?: string }) {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      <polyline points="9 22 9 12 15 12 15 22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-}
-
-function PencilIcon({ className }: { className?: string }) {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-}
-
-function UsersIcon({ className }: { className?: string }) {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="2"/>
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-}
-
-function PanelLeftCloseIcon({ className }: { className?: string }) {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
-      <path d="M9 3v18" stroke="currentColor" strokeWidth="2"/>
-      <path d="m16 15-3-3 3-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-}
 
 function ChevronDownIcon({ className }: { className?: string }) {
   return (
@@ -59,50 +25,6 @@ function UploadIcon({ className }: { className?: string }) {
       <polyline points="17 8 12 3 7 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
       <line x1="12" y1="3" x2="12" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
     </svg>
-  );
-}
-
-// --- Sidebar ---
-
-function Sidebar({ active }: { active: "home" | "applications" | "coffee-chats" }) {
-  const navItems = [
-    { key: "home" as const, label: "Home", icon: <HouseIcon />, href: "/applicant/dashboard" },
-    { key: "applications" as const, label: "Applications", icon: <PencilIcon />, href: "/applicant/dashboard" },
-    { key: "coffee-chats" as const, label: "Coffee Chats", icon: <UsersIcon />, href: "/applicant/dashboard/coffee-chats" },
-  ];
-
-  return (
-    <aside className="w-[272px] flex-shrink-0 border-r border-[#e4e4e7] bg-white flex flex-col justify-between h-screen sticky top-0 p-8">
-      <div className="flex flex-col gap-10">
-        <div className="px-[7px]">
-          <div className="relative w-[168px] h-[68px]">
-            <Image src="/images/icg-logo.png" alt="Irvine Consulting Group" fill className="object-contain" />
-          </div>
-        </div>
-        <nav className="flex flex-col gap-2">
-          {navItems.map((item) => (
-            <Link
-              key={item.key}
-              href={item.href}
-              className={`flex items-center gap-3 h-[58px] w-[208px] px-5 py-4 rounded-lg font-bold text-base text-[#061c2a] transition-colors ${
-                active === item.key ? "bg-[#f4f4f5]" : "hover:bg-[#f9fafb]"
-              }`}
-            >
-              {item.icon}
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-      </div>
-      <div className="flex items-center justify-between w-[208px]">
-        <div className="w-[45px] h-[45px] rounded-full bg-[#061c2a] flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
-          JD
-        </div>
-        <button type="button" className="text-[#a1a1aa] hover:text-[#374151] transition-colors" aria-label="Collapse sidebar">
-          <PanelLeftCloseIcon />
-        </button>
-      </div>
-    </aside>
   );
 }
 
@@ -131,12 +53,14 @@ function TextInput({
   value,
   onChange,
   type = "text",
+  disabled = false,
 }: {
   id: string;
   placeholder: string;
   value: string;
   onChange: (v: string) => void;
   type?: string;
+  disabled?: boolean;
 }) {
   return (
     <input
@@ -145,7 +69,8 @@ function TextInput({
       placeholder={placeholder}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="h-11 w-full border border-[#e4e4e7] rounded px-4 text-base text-[#111827] placeholder-[#a1a1aa] outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 transition"
+      disabled={disabled}
+      className="h-11 w-full border border-[#e4e4e7] rounded px-4 text-base text-[#111827] placeholder-[#a1a1aa] outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 transition disabled:bg-[#f9fafb] disabled:text-[#6b7280]"
     />
   );
 }
@@ -156,12 +81,14 @@ function TextArea({
   value,
   onChange,
   rows = 3,
+  disabled = false,
 }: {
   id: string;
   placeholder: string;
   value: string;
   onChange: (v: string) => void;
   rows?: number;
+  disabled?: boolean;
 }) {
   return (
     <textarea
@@ -170,7 +97,8 @@ function TextArea({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       rows={rows}
-      className="w-full border border-[#e4e4e7] rounded px-4 py-2.5 text-base text-[#111827] placeholder-[#a1a1aa] outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 transition resize-none"
+      disabled={disabled}
+      className="w-full border border-[#e4e4e7] rounded px-4 py-2.5 text-base text-[#111827] placeholder-[#a1a1aa] outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 transition resize-none disabled:bg-[#f9fafb] disabled:text-[#6b7280]"
     />
   );
 }
@@ -184,61 +112,20 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "availability", label: "Availability" },
 ];
 
-// --- Availability data ---
-
-const AVAILABILITY_DAYS = [
-  {
-    date: "Friday, September 18th",
-    slots: [
-      "9:00AM - 10:00AM",
-      "10:00AM - 11:00AM",
-      "11:00AM - 12:00PM",
-      "12:00PM - 1:00PM",
-      "1:00PM - 2:00PM",
-      "2:00PM - 3:00PM",
-      "3:00PM - 4:00PM",
-      "4:00PM - 5:00PM",
-    ],
-  },
-  {
-    date: "Saturday, September 19th",
-    slots: [
-      "9:00AM - 10:00AM",
-      "10:00AM - 11:00AM",
-      "11:00AM - 12:00PM",
-      "12:00PM - 1:00PM",
-      "1:00PM - 2:00PM",
-      "2:00PM - 3:00PM",
-      "3:00PM - 4:00PM",
-      "4:00PM - 5:00PM",
-    ],
-  },
-  {
-    date: "Sunday, September 20th",
-    slots: [
-      "9:00AM - 10:00AM",
-      "10:00AM - 11:00AM",
-      "11:00AM - 12:00PM",
-      "12:00PM - 1:00PM",
-      "1:00PM - 2:00PM",
-      "2:00PM - 3:00PM",
-      "3:00PM - 4:00PM",
-      "4:00PM - 5:00PM",
-    ],
-  },
-];
-
 // --- Main Page ---
 
 export default function ApplicationForm() {
   const params = useParams();
+  const router = useRouter();
   const positionId = params.id as string;
-  const positionTitle = positionId
-    .split("-")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
+  const position = getPositionById(positionId);
+  const positionTitle = position?.title ?? formatPositionTitle(positionId);
 
   const [activeTab, setActiveTab] = useState<Tab>("profile");
+  const [loadingApplication, setLoadingApplication] = useState(true);
+  const [applicationId, setApplicationId] = useState<string | null>(null);
+  const [readOnly, setReadOnly] = useState(false);
+  const [existingResumeName, setExistingResumeName] = useState<string | null>(null);
 
   // Profile fields
   const [firstName, setFirstName] = useState("");
@@ -262,10 +149,82 @@ export default function ApplicationForm() {
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
 
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const tabIndex = TABS.findIndex((t) => t.key === activeTab);
+  const isEditMode = Boolean(applicationId);
+  const formTitle = readOnly
+    ? "View Application"
+    : isEditMode
+      ? "Edit Application"
+      : "Application Form";
+
+  useEffect(() => {
+    void (async () => {
+      setLoadingApplication(true);
+      try {
+        const res = await fetch(`/api/applicants/mine?position=${encodeURIComponent(positionId)}`, {
+          credentials: "include",
+        });
+        const body = (await res.json()) as {
+          data?: ApplicantRow | null;
+          canEdit?: boolean;
+        };
+
+        if (res.ok && body.data) {
+          const hydrated = hydrateFormFromRow(body.data);
+          setApplicationId(hydrated.applicationId);
+          setFirstName(hydrated.firstName);
+          setLastName(hydrated.lastName);
+          setEmail(hydrated.email);
+          setGradYear(hydrated.gradYear);
+          setPhone(hydrated.phone);
+          setMajors(hydrated.majors);
+          setMinors(hydrated.minors);
+          setCareerGoals(hydrated.careerGoals);
+          setLinkedinUrl(hydrated.linkedinUrl);
+          setCommitments(hydrated.commitments);
+          setInfoSession(hydrated.infoSession);
+          setSelectedSlots(hydrated.selectedSlots);
+          if (hydrated.existingResumePath) {
+            setExistingResumeName(hydrated.existingResumePath.split("/").pop() ?? "Resume on file");
+          }
+          setReadOnly(!body.canEdit);
+        } else if (!canApplyToPosition(positionId)) {
+          setReadOnly(true);
+        }
+      } catch {
+        if (!canApplyToPosition(positionId)) setReadOnly(true);
+      } finally {
+        setLoadingApplication(false);
+      }
+    })();
+  }, [positionId]);
+
+  function buildFormData() {
+    const formData = new FormData();
+    formData.set("position", positionId);
+    formData.set("firstName", firstName);
+    formData.set("lastName", lastName);
+    formData.set("email", email);
+    formData.set("gradYear", gradYear);
+    formData.set("phone", phone);
+    formData.set("majors", majors);
+    formData.set("minors", minors);
+    formData.set("careerGoals", careerGoals);
+    formData.set("linkedinUrl", linkedinUrl);
+    formData.set("commitments", commitments);
+    formData.set("infoSession", infoSession);
+    formData.set("availableSlots", JSON.stringify(Array.from(selectedSlots)));
+    if (resumeFile) {
+      formData.set("resume", resumeFile);
+    }
+    return formData;
+  }
 
   function toggleSlot(slotKey: string) {
+    if (readOnly) return;
     setSelectedSlots((prev) => {
       const next = new Set(prev);
       if (next.has(slotKey)) next.delete(slotKey);
@@ -275,6 +234,7 @@ export default function ApplicationForm() {
   }
 
   function handleFileInput(file: File | undefined | null) {
+    if (readOnly) return;
     if (!file) return;
     if (file.type === "application/pdf" || file.type.startsWith("image/")) {
       setResumeFile(file);
@@ -293,15 +253,51 @@ export default function ApplicationForm() {
     }
   }
 
-  function handleSubmit() {
-    setSubmitted(true);
+  async function handleSubmit() {
+    if (readOnly) return;
+    setSubmitError("");
+    setSubmitting(true);
+    try {
+      const formData = buildFormData();
+      const url = applicationId ? `/api/applicants/${applicationId}` : "/api/applicants";
+      const method = applicationId ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        body: formData,
+        credentials: "include",
+      });
+
+      if (res.status === 401) {
+        router.push("/applicant/login");
+        return;
+      }
+
+      const body = (await res.json()) as { error?: string; applicationId?: string };
+      if (!res.ok) {
+        setSubmitError(body.error ?? "Something went wrong.");
+        return;
+      }
+
+      setSubmitted(true);
+    } catch {
+      setSubmitError("Network error. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (loadingApplication) {
+    return (
+      <main className="flex-1 flex items-center justify-center px-8 py-8">
+        <p className="text-[#6b7280]">Loading application…</p>
+      </main>
+    );
   }
 
   if (submitted) {
     return (
-      <div className="flex min-h-screen bg-white font-sans">
-        <Sidebar active="home" />
-        <main className="flex-1 flex items-center justify-center px-8 py-8">
+      <main className="flex-1 flex items-center justify-center px-8 py-8">
           <div className="text-center flex flex-col items-center gap-6">
             <div className="w-16 h-16 rounded-full bg-[#061c2a] flex items-center justify-center">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -309,7 +305,9 @@ export default function ApplicationForm() {
               </svg>
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-black mb-2">Application Submitted!</h1>
+              <h1 className="text-3xl font-bold text-black mb-2">
+                {isEditMode ? "Application Updated!" : "Application Submitted!"}
+              </h1>
               <p className="text-[#52525b] text-lg">
                 Thank you for applying for the{" "}
                 <span className="font-semibold text-[#061c2a]">{positionTitle}</span> position.
@@ -325,22 +323,38 @@ export default function ApplicationForm() {
               Back to Dashboard
             </Link>
           </div>
-        </main>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-white font-sans">
-      <Sidebar active="home" />
-
-      <main className="flex-1 px-8 py-[99px] overflow-y-auto">
+    <main className="flex-1 px-8 py-[99px] overflow-y-auto">
         <div className="max-w-[1079px] flex flex-col gap-8">
           {/* Header */}
           <div className="flex flex-col gap-3">
-            <h1 className="text-[30px] font-bold leading-[38px] text-black">Application Form</h1>
+            <h1 className="text-[30px] font-bold leading-[38px] text-black">{formTitle}</h1>
             <p className="text-lg font-medium leading-7 text-[#a1a1aa]">{positionTitle}</p>
+            {position && (
+              <p className="text-sm text-[#6b7280]">
+                Deadline: {position.closeDate}
+                {readOnly && isEditMode && " — editing is closed"}
+              </p>
+            )}
           </div>
+
+          {readOnly && (
+            <div className="rounded-md border border-[#e4e4e7] bg-[#f9fafb] px-4 py-3 text-sm text-[#52525b]">
+              {isEditMode
+                ? "This application has been submitted and the deadline has passed. You can review your responses below but cannot make changes."
+                : "Applications for this position are closed."}
+            </div>
+          )}
+
+          {!readOnly && isEditMode && (
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              You&apos;ve already applied for this position. Update your answers below and save before the deadline.
+            </div>
+          )}
 
           {/* Tabs */}
           <div className="border-b border-[#e4e4e7] flex">
@@ -361,6 +375,7 @@ export default function ApplicationForm() {
           </div>
 
           {/* Tab content */}
+          <fieldset disabled={readOnly} className="contents min-w-0">
           {activeTab === "profile" && (
             <div className="bg-white border border-[#e4e4e7] rounded-md p-8">
               <div className="flex flex-col gap-[46px]">
@@ -502,6 +517,8 @@ export default function ApplicationForm() {
                 <UploadIcon className="text-[#52525b]" />
                 {resumeFile ? (
                   <p className="text-sm font-medium text-[#061c2a]">{resumeFile.name}</p>
+                ) : existingResumeName ? (
+                  <p className="text-sm font-medium text-[#061c2a]">{existingResumeName}</p>
                 ) : (
                   <>
                     <p className="text-sm text-black">
@@ -524,12 +541,12 @@ export default function ApplicationForm() {
                 </p>
               </div>
 
-              {AVAILABILITY_DAYS.map((day) => (
+              {GROUP_INTERVIEW_DAYS.map((day) => (
                 <div key={day.date} className="flex flex-col gap-2">
                   <p className="text-sm text-[#52525b]">{day.date}</p>
                   <div className="grid grid-cols-4 gap-3">
                     {day.slots.map((slot) => {
-                      const slotKey = `${day.date}::${slot}`;
+                      const slotKey = buildSlotId(day.date, slot);
                       const checked = selectedSlots.has(slotKey);
                       return (
                         <button
@@ -562,8 +579,14 @@ export default function ApplicationForm() {
               ))}
             </div>
           )}
+          </fieldset>
 
           {/* Navigation buttons */}
+          {submitError && (
+            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {submitError}
+            </div>
+          )}
           <div className="flex gap-[498px] items-center">
             {tabIndex > 0 ? (
               <button
@@ -585,18 +608,25 @@ export default function ApplicationForm() {
               >
                 Next
               </button>
+            ) : readOnly ? (
+              <Link
+                href="/applicant/dashboard"
+                className="flex-1 h-[62px] bg-[#061c2a] text-white text-lg font-medium rounded-[5px] hover:bg-[#0d2f47] transition-colors flex items-center justify-center"
+              >
+                Back to Dashboard
+              </Link>
             ) : (
               <button
                 type="button"
-                onClick={handleSubmit}
-                className="flex-1 h-[62px] bg-[#061c2a] text-white text-lg font-medium rounded-[5px] hover:bg-[#0d2f47] transition-colors"
+                onClick={() => void handleSubmit()}
+                disabled={submitting}
+                className="flex-1 h-[62px] bg-[#061c2a] text-white text-lg font-medium rounded-[5px] hover:bg-[#0d2f47] transition-colors disabled:opacity-60"
               >
-                Submit Application
+                {submitting ? "Saving…" : isEditMode ? "Save Changes" : "Submit Application"}
               </button>
             )}
           </div>
         </div>
       </main>
-    </div>
   );
 }
