@@ -7,6 +7,7 @@ import {
   type CoffeeChatMember,
 } from "@/lib/officers/directory-members";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
+import { resolveCoffeeChatCalendlyUrl } from "@/lib/calendly";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -76,20 +77,17 @@ function UserCircleIcon({ className }: { className?: string }) {
 
 type Member = CoffeeChatMember;
 
-function requestChatPlaceholder(member: Member) {
-  // Calendly links will be wired per-officer in a follow-up.
-  void member;
-}
-
 // ─── Member Card ──────────────────────────────────────────────────────────────
 
 function MemberCard({
   member,
   onLearnMore,
+  onChat,
   index,
 }: {
   member: Member;
   onLearnMore: (m: Member) => void;
+  onChat: (m: Member) => void;
   index: number;
 }) {
   const [imgError, setImgError] = useState(false);
@@ -141,7 +139,7 @@ function MemberCard({
         </button>
         <button
           type="button"
-          onClick={() => requestChatPlaceholder(member)}
+          onClick={() => onChat(member)}
           className="flex-1 h-10 bg-[#061c2a] rounded-lg text-sm font-medium text-white hover:bg-[#0d2f47] transition-colors"
         >
           Chat
@@ -157,10 +155,12 @@ function ProfileModal({
   member,
   onClose,
   onTagSearch,
+  onChat,
 }: {
   member: Member;
   onClose: () => void;
   onTagSearch?: (tag: string) => void;
+  onChat: (m: Member) => void;
 }) {
   const [imgError, setImgError] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -249,7 +249,7 @@ function ProfileModal({
 
             <button
               type="button"
-              onClick={() => requestChatPlaceholder(member)}
+              onClick={() => onChat(member)}
               className="flex items-center justify-center gap-2 h-11 w-full bg-[#061c2a] text-white text-sm font-medium rounded-lg hover:bg-[#0d2f47] transition-colors mt-auto"
             >
               Chat
@@ -280,7 +280,23 @@ export default function CoffeeChatsPage() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [notice, setNotice] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+
+  function handleRequestChat(member: Member) {
+    const url = resolveCoffeeChatCalendlyUrl(member.calendly);
+    if (url) {
+      window.open(url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    setNotice(`${member.name.split(" ")[0]}'s scheduling link isn't set up yet — check back soon!`);
+  }
+
+  useEffect(() => {
+    if (!notice) return;
+    const t = window.setTimeout(() => setNotice(""), 4000);
+    return () => window.clearTimeout(t);
+  }, [notice]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -417,6 +433,7 @@ export default function CoffeeChatsPage() {
                   member={member}
                   index={index}
                   onLearnMore={setSelectedMember}
+                  onChat={handleRequestChat}
                 />
               ))}
             </div>
@@ -428,11 +445,21 @@ export default function CoffeeChatsPage() {
         <ProfileModal
           member={selectedMember}
           onClose={() => setSelectedMember(null)}
+          onChat={handleRequestChat}
           onTagSearch={(tag) => {
             setSearch(tag);
             setActiveTab("all");
           }}
         />
+      )}
+
+      {notice && (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[300] rounded-lg bg-[#061c2a] text-white text-sm font-medium px-5 py-3 shadow-lg animate-fade-in"
+        >
+          {notice}
+        </div>
       )}
     </>
   );

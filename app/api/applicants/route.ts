@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import {
-  assertCanEditPosition,
   formToRow,
   parseApplicationFormData,
   uploadResumeForApplication,
@@ -37,11 +36,11 @@ export async function GET(request: Request) {
   let query = admin.from("applicants").select(columns, { count: "exact" });
   if (pipeline === "group-interview") {
     query = query.eq("app_status", "advanced");
-  } else if (pipeline === "coffee-chats") {
-    query = query.eq("gi_status", "completed");
   } else if (pipeline === "decisions") {
     query = query.eq("cc_status", "completed");
   }
+  // "coffee-chats" has no stage gate: it's an early data-collection surface
+  // (before the group interview) where members log notes on any applicant.
   if (listQuery.status) {
     query = query.eq("app_status", listQuery.status);
   }

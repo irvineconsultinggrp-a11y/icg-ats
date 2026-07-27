@@ -8,6 +8,8 @@ export type CoffeeChatMember = {
   bio: string;
   interests: string[];
   photo: string;
+  /** Optional per-officer Calendly link; falls back to NEXT_PUBLIC_COFFEE_CHAT_CALENDLY_URL. */
+  calendly?: string;
 };
 
 /** Static ICG officer directory for the applicant coffee chat scheduler. */

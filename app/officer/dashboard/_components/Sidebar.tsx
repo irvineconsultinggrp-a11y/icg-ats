@@ -2,9 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { createClient } from "@/utils/supabase/client";
+import { usePathname } from "next/navigation";
+import { OfficerAccountMenu } from "./OfficerAccountMenu";
 
 function HouseIcon({ className }: { className?: string }) {
   return (
@@ -57,16 +56,6 @@ function CheckSquareIcon({ className }: { className?: string }) {
   );
 }
 
-function LogOutIcon({ className }: { className?: string }) {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      <polyline points="16 17 21 12 16 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-}
-
 type OfficerNav = "home" | "applications" | "group-interview" | "coffee-chats" | "decisions";
 
 function getActiveNav(pathname: string): OfficerNav {
@@ -80,40 +69,13 @@ function getActiveNav(pathname: string): OfficerNav {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const active = getActiveNav(pathname);
-  const [displayName, setDisplayName] = useState("Officer");
-  const [email, setEmail] = useState("");
-  const [initials, setInitials] = useState("O");
-
-  useEffect(() => {
-    void (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const addr = user.email ?? "";
-      setEmail(addr);
-      const local = addr.split("@")[0] ?? "officer";
-      const parts = local.replace(/[._-]/g, " ").split(/\s+/).filter(Boolean);
-      const name =
-        (user.user_metadata?.full_name as string | undefined) ??
-        (parts.length >= 2
-          ? `${parts[0]} ${parts[parts.length - 1]}`
-          : parts[0] ?? "Officer");
-      setDisplayName(name);
-      const ini =
-        parts.length >= 2
-          ? `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase()
-          : (parts[0]?.slice(0, 2) ?? "O").toUpperCase();
-      setInitials(ini);
-    })();
-  }, []);
 
   const navItems: { key: OfficerNav; label: string; icon: React.ReactNode; href: string }[] = [
     { key: "home",            label: "Home",            icon: <HouseIcon />,       href: "/officer/dashboard" },
     { key: "applications",    label: "Applications",    icon: <FileTextIcon />,    href: "/officer/dashboard/applications" },
-    { key: "group-interview", label: "Group Interview", icon: <UsersIcon />,       href: "/officer/dashboard/group-interview" },
     { key: "coffee-chats",    label: "Coffee Chats",    icon: <CoffeeIcon />,      href: "/officer/dashboard/coffee-chats" },
+    { key: "group-interview", label: "Group Interview", icon: <UsersIcon />,       href: "/officer/dashboard/group-interview" },
     { key: "decisions",       label: "Decisions",       icon: <CheckSquareIcon />, href: "/officer/dashboard/decisions" },
   ];
 
@@ -141,30 +103,8 @@ export function Sidebar() {
         </nav>
       </div>
 
-      <div className="flex items-center justify-between w-[208px]">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-[40px] h-[40px] rounded-full bg-[#061c2a] flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
-            {initials}
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-[#111827] truncate">{displayName}</p>
-            <p className="text-xs text-[#a1a1aa] truncate">{email || "Signed in"}</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={async () => {
-            const supabase = createClient();
-            await supabase.auth.signOut();
-            router.push("/");
-            router.refresh();
-          }}
-          className="text-[#a1a1aa] hover:text-red-500 transition-colors flex-shrink-0"
-          aria-label="Sign out"
-          title="Sign out"
-        >
-          <LogOutIcon />
-        </button>
+      <div className="w-[208px]">
+        <OfficerAccountMenu />
       </div>
     </aside>
   );

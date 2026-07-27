@@ -80,9 +80,14 @@ export function isKnownGroupInterviewSlot(id: string): boolean {
   return slotById.has(id);
 }
 
-export function applicantMatchesSlot(
-  applicant: { availableSlots: string[]; assignedSlot: string | null },
+/**
+ * True when the applicant is *assigned* to this interview slot. Selecting a slot
+ * shows its roster, so this matches on the assigned slot only — not availability
+ * (an applicant available for a slot but scheduled elsewhere must not appear here).
+ */
+export function applicantAssignedToSlot(
+  applicant: { assignedSlot: string | null },
   slotId: string,
 ): boolean {
-  return applicant.availableSlots.includes(slotId) || applicant.assignedSlot === slotId;
+  return applicant.assignedSlot === slotId;
 }

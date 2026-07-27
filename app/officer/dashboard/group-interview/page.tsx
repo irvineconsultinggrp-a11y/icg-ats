@@ -8,7 +8,7 @@ import {
   rowToGroupInterview,
 } from "@/lib/applicants/stages";
 import {
-  applicantMatchesSlot,
+  applicantAssignedToSlot,
   buildSlotId,
   getGroupInterviewSlot,
   GROUP_INTERVIEW_DAYS,
@@ -547,7 +547,7 @@ export default function GroupInterviewPage() {
     () =>
       applicants.filter((a) => {
         if (sessionFilter === "all") return true;
-        return applicantMatchesSlot(a, sessionFilter);
+        return applicantAssignedToSlot(a, sessionFilter);
       }),
     [applicants, sessionFilter],
   );

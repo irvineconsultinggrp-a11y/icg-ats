@@ -172,10 +172,12 @@ function DetailPanel({
   decision,
   onClose,
   onUpdate,
+  saveError,
 }: {
   decision: Decision;
   onClose: () => void;
   onUpdate: (patch: Partial<Decision>) => void;
+  saveError?: string;
 }) {
   const [notes, setNotes] = useState(decision.notes);
   const initials = `${decision.firstName[0]}${decision.lastName[0]}`;
@@ -194,6 +196,11 @@ function DetailPanel({
       </div>
 
       <div className="flex flex-col gap-6 p-6">
+        {saveError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+            {saveError}
+          </div>
+        )}
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-full bg-[#061c2a] flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
             {initials}
@@ -587,6 +594,7 @@ export default function DecisionsPage() {
             decision={selected}
             onClose={() => setSelectedId(null)}
             onUpdate={(patch) => updateDecision(selected.id, patch)}
+            saveError={saveError}
           />
         )}
       </div>

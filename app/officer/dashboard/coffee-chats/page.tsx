@@ -15,6 +15,7 @@ import {
 } from "../_components/LazyEmailTemplatesModal";
 import type { ApplicantStats } from "@/app/api/applicants/stats/route";
 import { getDefaultCoffeeChatCalendlyUrl } from "@/lib/calendly";
+import { NotesFolder } from "@/components/notes/NotesFolder";
 
 // --- Icons ---
 
@@ -221,12 +222,13 @@ function DetailPanel({
   chat,
   onClose,
   onUpdate,
+  saveError,
 }: {
   chat: CoffeeChat;
   onClose: () => void;
   onUpdate: (patch: Partial<CoffeeChat>) => void;
+  saveError?: string;
 }) {
-  const [notes, setNotes] = useState(chat.notes);
   const [date, setDate]   = useState(chat.scheduledDate ?? "");
   const [time, setTime]   = useState(chat.scheduledTime ?? "");
   const [officer, setOfficer] = useState(chat.assignedOfficer ?? "");
@@ -258,6 +260,11 @@ function DetailPanel({
       </div>
 
       <div className="flex flex-col gap-6 p-6">
+        {saveError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+            {saveError}
+          </div>
+        )}
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-full bg-[#061c2a] flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
             {initials}
@@ -283,7 +290,13 @@ function DetailPanel({
 
         {/* Schedule */}
         <div className="flex flex-col gap-3">
-          <p className="text-sm font-medium text-[#374151]">Schedule</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-[#374151]">Schedule</p>
+            <span className={`text-xs text-green-600 font-medium flex items-center gap-1 transition-opacity duration-300 ${savedFlash ? "opacity-100" : "opacity-0"}`}>
+              <CheckCircleIcon className="w-3 h-3" />
+              Saved
+            </span>
+          </div>
           <div className="flex flex-col gap-2">
             <div className="flex flex-col gap-1">
               <label className="text-xs text-[#6b7280] font-medium">Date</label>
@@ -348,27 +361,11 @@ function DetailPanel({
           <StarRating value={chat.score} onChange={(v) => onUpdate({ score: v })} />
         </div>
 
-        {/* Notes */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-[#111827]">Coffee Chat Notes</p>
-            <span className={`text-xs text-green-600 font-medium flex items-center gap-1 transition-opacity duration-300 ${savedFlash ? "opacity-100" : "opacity-0"}`}>
-              <CheckCircleIcon className="w-3 h-3" />
-              Saved
-            </span>
-          </div>
-          <p className="text-xs text-[#6b7280]">
-            Track impressions, strengths, and follow-ups from the conversation.
-          </p>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            onBlur={() => { onUpdate({ notes }); triggerSaved(); }}
-            rows={8}
-            placeholder="What stood out? Any concerns? Recommended next steps…"
-            className="w-full border border-[#e4e4e7] rounded-lg px-4 py-3 text-sm text-[#111827] placeholder-[#a1a1aa] outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 transition resize-none min-h-[160px]"
-          />
-        </div>
+        {/* Notes folder — one attributed note per member */}
+        <NotesFolder
+          applicantId={chat.id}
+          applicantName={`${chat.firstName} ${chat.lastName}`}
+        />
 
         <div className="flex flex-col gap-2 pt-1">
           <button
@@ -813,6 +810,7 @@ export default function CoffeeChatsPage() {
             chat={selected}
             onClose={() => setSelectedId(null)}
             onUpdate={(patch) => updateChat(selected.id, patch)}
+            saveError={saveError}
           />
         )}
       </div>

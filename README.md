@@ -1,43 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ICG ATS — Recruitment Portal
 
-## Supabase setup (applications & resumes)
+Applicant tracking system for Irvine Consulting Group. Applicants apply and track their
+status; officers manage the recruitment pipeline (Applications → Coffee Chats → Group
+Interview → Decisions), log per-applicant notes, and make offers.
 
-1. Copy [`.env.example`](.env.example) to `.env.local` and fill in values from your [Supabase project](https://supabase.com/dashboard).
-2. Run the SQL in [`supabase/migrations`](supabase/migrations) in the Supabase SQL editor (in order).
-3. Set **`app_metadata.role`** to `officer` for officer accounts (Dashboard → Authentication → Users). Applicant accounts get `applicant` automatically on signup/login.
-4. `SUPABASE_SERVICE_ROLE_KEY` is required for resume uploads and role assignment — keep it server-only.
+**Stack:** Next.js 16 (App Router) · React 19 · Supabase (Auth, Postgres + RLS, Storage) · Tailwind v4.
 
-## Getting Started
+---
 
-First, run the development server:
+## 1. Environment variables
+
+Copy [`.env.example`](.env.example) to `.env.local` and fill in the values from your
+[Supabase project](https://supabase.com/dashboard) (Project Settings → API).
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | ✅ | Public (anon/publishable) key |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Server-only. Resume uploads, role assignment, officer signup, notes. **Never expose to the client.** |
+| `OFFICER_SIGNUP_CODE` | ▲ | Shared invite code for officer self-signup at `/officer/signup`. Leave blank to disable self-signup. |
+| `NEXT_PUBLIC_REQUIRE_UCI_EMAIL` | – | `true` restricts applicant signup to `@uci.edu`. Default `false`. |
+| `NEXT_PUBLIC_SITE_URL` | – | Site origin for OAuth / password-reset redirects. Defaults to `http://localhost:3000`. |
+| `NEXT_PUBLIC_COFFEE_CHAT_CALENDLY_URL` | – | Default Calendly link for the applicant "Chat" button (per-officer links can override). |
+| `GOOGLE_APPS_SCRIPT_WEBHOOK_URL` / `GOOGLE_APPS_SCRIPT_SECRET` | – | Optional webhook fired after a new application. |
+
+The app fails fast with a clear message if the required Supabase vars are missing.
+
+## 2. Database setup
+
+Run the SQL files in [`supabase/migrations`](supabase/migrations) **in filename order** in
+the Supabase SQL Editor (Dashboard → SQL Editor → New query):
+
+1. `20250520120000_applicants_officers.sql` — core tables, columns, RLS
+2. `20250520120001_resumes_storage.sql` — private `resumes` storage bucket
+3. `20250520120002_applicants_update_own.sql`
+4. `20250520120003_pipeline_coffee_chats.sql` — pipeline fields + coffee-chat requests
+5. `20250520120004_performance_indexes.sql`
+6. `20250520120005_applicant_notes.sql` — per-applicant notes folder
+
+Every migration is idempotent, so re-running is safe.
+
+## 3. Accounts & roles
+
+Auth uses `app_metadata.role` (`applicant` | `officer`), enforced by middleware and RLS.
+
+- **Applicants** self-assign the `applicant` role automatically on signup/login.
+- **Officers** — two options:
+  - **Invite code (recommended):** set `OFFICER_SIGNUP_CODE`, share the code + the
+    `/officer/signup` link. Accounts are created with officer role and email pre-confirmed.
+  - **Manual:** Dashboard → Authentication → Users → set `app_metadata.role` to `officer`.
+
+## 4. Local development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). Entry points: `/applicant/login`,
+`/officer/login`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build   # production build
+npm run lint    # eslint
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 5. Deploy (Vercel)
 
-## Learn More
+1. Import the repo into Vercel.
+2. Add every variable from section 1 in Project → Settings → Environment Variables
+   (keep `SUPABASE_SERVICE_ROLE_KEY` and `OFFICER_SIGNUP_CODE` server-side only).
+3. Set `NEXT_PUBLIC_SITE_URL` to your production URL and add `<site>/auth/callback` to
+   Supabase → Authentication → URL Configuration → Redirect URLs.
+4. Deploy.
 
-To learn more about Next.js, take a look at the following resources:
+## Recruitment pipeline
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Applications → Coffee Chats → Group Interview → Decisions.** Coffee Chats is an early
+data-collection stage: any officer can open an applicant and keep their own attributed,
+rich-text note in that applicant's shared notes folder.

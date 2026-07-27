@@ -77,15 +77,15 @@ function ClockIcon({ className }: { className?: string }) {
 
 const PIPELINE_STAGES = [
   { stage: "Applications",    key: "applications" as const,    href: "/officer/dashboard/applications",   icon: <FileTextIcon />,    color: "text-violet-600", bg: "bg-violet-50",  border: "border-violet-200" },
-  { stage: "Group Interview", key: "groupInterview" as const, href: "/officer/dashboard/group-interview", icon: <UsersIcon />,       color: "text-blue-600",   bg: "bg-blue-50",    border: "border-blue-200" },
   { stage: "Coffee Chats",    key: "coffeeChats" as const,    href: "/officer/dashboard/coffee-chats",    icon: <CoffeeIcon />,      color: "text-amber-600",  bg: "bg-amber-50",   border: "border-amber-200" },
+  { stage: "Group Interview", key: "groupInterview" as const, href: "/officer/dashboard/group-interview", icon: <UsersIcon />,       color: "text-blue-600",   bg: "bg-blue-50",    border: "border-blue-200" },
   { stage: "Decisions",       key: "decisions" as const,       href: "/officer/dashboard/decisions",       icon: <CheckSquareIcon />, color: "text-green-600",  bg: "bg-green-50",   border: "border-green-200" },
 ];
 
 const QUICK_ACTIONS = [
   { label: "Review Applications",    subtitle: "Manage submitted applications",   href: "/officer/dashboard/applications",   icon: <FileTextIcon />,    iconBg: "bg-violet-50", iconColor: "text-violet-600" },
+  { label: "Coffee Chat Notes",      subtitle: "Log notes on applicants you chat", href: "/officer/dashboard/coffee-chats",    icon: <CoffeeIcon />,      iconBg: "bg-amber-50",  iconColor: "text-amber-600" },
   { label: "Manage Group Interview", subtitle: "Assign sessions & score applicants", href: "/officer/dashboard/group-interview", icon: <UsersIcon />,       iconBg: "bg-blue-50",   iconColor: "text-blue-600" },
-  { label: "Schedule Coffee Chats",  subtitle: "Coordinate 1-on-1 officer chats",  href: "/officer/dashboard/coffee-chats",    icon: <CoffeeIcon />,      iconBg: "bg-amber-50",  iconColor: "text-amber-600" },
   { label: "Finalize Decisions",     subtitle: "Send acceptance & rejection offers", href: "/officer/dashboard/decisions",       icon: <CheckSquareIcon />, iconBg: "bg-green-50",  iconColor: "text-green-600" },
 ];
 
@@ -157,7 +157,7 @@ export default function OfficerDashboardHome() {
         <div>
           <p className="text-sm text-[#6b7280] font-medium">Fall 2026 Recruitment</p>
           <h1 className="text-2xl font-bold text-[#061c2a] mt-0.5">Officer Dashboard</h1>
-          <p className="text-sm text-[#6b7280] mt-1">Welcome back. Here's what's happening across the recruitment pipeline.</p>
+          <p className="text-sm text-[#6b7280] mt-1">Welcome back. Here&apos;s what&apos;s happening across the recruitment pipeline.</p>
         </div>
 
         {loadError && (

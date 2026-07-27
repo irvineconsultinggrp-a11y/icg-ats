@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import {
-  APPLICANT_EMAIL_ERROR,
-  isApplicantEmailAllowed,
-} from "@/lib/auth/applicant-email";
+import { isApplicantEmailAllowed } from "@/lib/auth/applicant-email";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 

@@ -35,7 +35,7 @@ export default function OfficerLogin() {
     if (user?.app_metadata?.role !== "officer") {
       await supabase.auth.signOut();
       setLoading(false);
-      setError("This account does not have officer access. Contact your admin to get officer role assigned.");
+      setError("This account does not have officer access. If you're an officer, create your account with an invite code below.");
       return;
     }
 
@@ -214,6 +214,13 @@ export default function OfficerLogin() {
               )}
             </button>
           </form>
+
+          <p className="text-sm text-[#6b7280] text-center">
+            Don&apos;t have an officer account?{" "}
+            <Link href="/officer/signup" className="text-[#061c2a] font-medium hover:underline">
+              Create one with an invite code
+            </Link>
+          </p>
         </div>
       </div>
     </div>
