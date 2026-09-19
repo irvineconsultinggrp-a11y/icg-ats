@@ -56,13 +56,30 @@ function CheckSquareIcon({ className }: { className?: string }) {
   );
 }
 
-type OfficerNav = "home" | "applications" | "group-interview" | "coffee-chats" | "decisions";
+function FireIcon({ className }: { className?: string }) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M12 2c1 3 4 4.5 4 8a4 4 0 0 1-8 0c0-1 .5-2 1-2.5C9 9 8 11 8 13a4 4 0 0 0 8 0c0-3-2-5-4-11z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+type OfficerNav =
+  | "home"
+  | "applications"
+  | "coffee-chats"
+  | "round-1"
+  | "round-2"
+  | "bbq-social"
+  | "decisions";
 
 function getActiveNav(pathname: string): OfficerNav {
   if (pathname === "/officer/dashboard") return "home";
   if (pathname.includes("/applications")) return "applications";
-  if (pathname.includes("/group-interview")) return "group-interview";
   if (pathname.includes("/coffee-chats")) return "coffee-chats";
+  if (pathname.includes("/round-1")) return "round-1";
+  if (pathname.includes("/round-2")) return "round-2";
+  if (pathname.includes("/bbq-social")) return "bbq-social";
   if (pathname.includes("/decisions")) return "decisions";
   return "home";
 }
@@ -72,11 +89,13 @@ export function Sidebar() {
   const active = getActiveNav(pathname);
 
   const navItems: { key: OfficerNav; label: string; icon: React.ReactNode; href: string }[] = [
-    { key: "home",            label: "Home",            icon: <HouseIcon />,       href: "/officer/dashboard" },
-    { key: "applications",    label: "Applications",    icon: <FileTextIcon />,    href: "/officer/dashboard/applications" },
-    { key: "coffee-chats",    label: "Coffee Chats",    icon: <CoffeeIcon />,      href: "/officer/dashboard/coffee-chats" },
-    { key: "group-interview", label: "Group Interview", icon: <UsersIcon />,       href: "/officer/dashboard/group-interview" },
-    { key: "decisions",       label: "Decisions",       icon: <CheckSquareIcon />, href: "/officer/dashboard/decisions" },
+    { key: "home",         label: "Home",         icon: <HouseIcon />,       href: "/officer/dashboard" },
+    { key: "applications", label: "Applications", icon: <FileTextIcon />,    href: "/officer/dashboard/applications" },
+    { key: "coffee-chats", label: "Coffee Chats", icon: <CoffeeIcon />,      href: "/officer/dashboard/coffee-chats" },
+    { key: "round-1",      label: "Round 1",      icon: <UsersIcon />,       href: "/officer/dashboard/round-1" },
+    { key: "round-2",      label: "Round 2",      icon: <UsersIcon />,       href: "/officer/dashboard/round-2" },
+    { key: "bbq-social",   label: "BBQ Social",   icon: <FireIcon />,        href: "/officer/dashboard/bbq-social" },
+    { key: "decisions",    label: "Decisions",    icon: <CheckSquareIcon />, href: "/officer/dashboard/decisions" },
   ];
 
   return (

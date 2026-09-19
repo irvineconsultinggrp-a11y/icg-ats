@@ -60,10 +60,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Server configuration error." }, { status: 500 });
   }
 
+  // Create the account with the officer role set server-side (secure), but leave it
+  // unconfirmed — the officer must click a confirmation email so a mistyped address is
+  // caught before the account can be used. The signup page triggers the email via resend.
   const { error } = await admin.auth.admin.createUser({
     email,
     password,
-    email_confirm: true,
+    email_confirm: false,
     user_metadata: { full_name: fullName, first_name: firstName, last_name: lastName },
     app_metadata: { role: "officer" },
   });

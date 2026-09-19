@@ -491,6 +491,11 @@ export default function CoffeeChatsPage() {
       prev.map((c) => (c.id === id ? rowToCoffeeChat(result.data!) : c)),
     );
     void loadStatusCounts();
+    // A status change moves the applicant between tabs — reload the filtered view.
+    if (patch.status !== undefined && activeTab !== "all") {
+      setSelectedId(null);
+      void loadChats();
+    }
   }
 
   function handleSort(col: "name" | "status" | "score") {

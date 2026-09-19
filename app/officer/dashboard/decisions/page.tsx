@@ -113,7 +113,7 @@ const DECISION_EMAIL_TEMPLATES: EmailTemplate[] = [
     subject: "Welcome to ICG! – Offer of Membership",
     html: `<p>Dear <strong>[First Name]</strong>,</p>
 <p>On behalf of the entire <strong>Irvine Consulting Group (ICG)</strong> team, we are absolutely thrilled to offer you a position as a <strong>Junior Associate</strong> for the <strong>Fall 2026</strong> term!</p>
-<p>Your performance throughout the recruitment process — your application, group interview, and coffee chat — truly stood out, and we are confident you will be a tremendous asset to our team.</p>
+<p>Your performance throughout the recruitment process — your application, individual interviews, and social — truly stood out, and we are confident you will be a tremendous asset to our team.</p>
 <p><strong>Next Steps</strong></p>
 <ul>
 <li>Please confirm your acceptance by replying to this email by <strong>[Acceptance Deadline]</strong></li>
@@ -126,7 +126,7 @@ const DECISION_EMAIL_TEMPLATES: EmailTemplate[] = [
 
 On behalf of the entire Irvine Consulting Group (ICG) team, we are absolutely thrilled to offer you a position as a Junior Associate for the Fall 2026 term!
 
-Your performance throughout the recruitment process — your application, group interview, and coffee chat — truly stood out, and we are confident you will be a tremendous asset to our team.
+Your performance throughout the recruitment process — your application, individual interviews, and social — truly stood out, and we are confident you will be a tremendous asset to our team.
 
 Next Steps
 - Please confirm your acceptance by replying to this email by [Acceptance Deadline]
@@ -182,8 +182,8 @@ function DetailPanel({
   const [notes, setNotes] = useState(decision.notes);
   const initials = `${decision.firstName[0]}${decision.lastName[0]}`;
   const avgScore =
-    decision.giScore !== null && decision.ccScore !== null
-      ? ((decision.giScore + decision.ccScore) / 2).toFixed(1)
+    decision.r1Score !== null && decision.r2Score !== null
+      ? ((decision.r1Score + decision.r2Score) / 2).toFixed(1)
       : null;
 
   return (
@@ -229,12 +229,12 @@ function DetailPanel({
           <p className="text-sm font-semibold text-[#374151]">Score Summary</p>
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-[#6b7280]">Group Interview</span>
-              <ScoreStars value={decision.giScore} />
+              <span className="text-xs text-[#6b7280]">Round 1</span>
+              <ScoreStars value={decision.r1Score} />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-[#6b7280]">Coffee Chat</span>
-              <ScoreStars value={decision.ccScore} />
+              <span className="text-xs text-[#6b7280]">Round 2</span>
+              <ScoreStars value={decision.r2Score} />
             </div>
             {avgScore && (
               <div className="flex items-center justify-between pt-2 border-t border-[#e4e4e7] mt-1">
@@ -367,6 +367,11 @@ export default function DecisionsPage() {
     setDecisions((prev) =>
       prev.map((d) => (d.id === id ? rowToDecision(result.data!) : d)),
     );
+    // A status change moves the applicant between tabs — reload the filtered view.
+    if (patch.status !== undefined && activeTab !== "all") {
+      setSelectedId(null);
+      void loadDecisions();
+    }
   }
 
   const counts: Record<StatusTab, number> = useMemo(
@@ -477,7 +482,7 @@ export default function DecisionsPage() {
               </p>
               <p className="text-sm text-[#a1a1aa] mt-1">
                 {total === 0
-                  ? "Applicants who complete Coffee Chats will appear here for a final decision."
+                  ? "Applicants accepted to the BBQ Social will appear here for a final decision."
                   : "Try adjusting your filters or search."}
               </p>
             </div>
@@ -486,7 +491,7 @@ export default function DecisionsPage() {
               <table className="w-full text-sm">
                 <thead className="bg-[#f9fafb] border-b border-[#e4e4e7]">
                   <tr>
-                    {["Applicant", "Year / Major", "GI Score", "Chat Score", "Status", ""].map((h) => (
+                    {["Applicant", "Year / Major", "Round 1", "Round 2", "Status", ""].map((h) => (
                       <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-[#6b7280] uppercase tracking-wide whitespace-nowrap">
                         {h}
                       </th>
@@ -520,10 +525,10 @@ export default function DecisionsPage() {
                           <p className="text-xs text-[#6b7280] mt-0.5 max-w-[160px] truncate">{d.major}</p>
                         </td>
                         <td className="px-5 py-4">
-                          <ScoreStars value={d.giScore} />
+                          <ScoreStars value={d.r1Score} />
                         </td>
                         <td className="px-5 py-4">
-                          <ScoreStars value={d.ccScore} />
+                          <ScoreStars value={d.r2Score} />
                         </td>
                         <td className="px-5 py-4">
                           <StatusBadge status={d.status} />

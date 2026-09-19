@@ -24,8 +24,10 @@ export async function GET(request: Request) {
   const listQuery = parseListApplicantsQuery(url.searchParams);
   const pipelineParam = url.searchParams.get("pipeline");
   const pipeline: ApplicantPipelineParam =
-    pipelineParam === "group-interview" ||
     pipelineParam === "coffee-chats" ||
+    pipelineParam === "round-1" ||
+    pipelineParam === "round-2" ||
+    pipelineParam === "bbq-social" ||
     pipelineParam === "decisions"
       ? pipelineParam
       : null;
@@ -34,21 +36,31 @@ export async function GET(request: Request) {
   const columns = selectColumnsForPipeline(pipeline);
 
   let query = admin.from("applicants").select(columns, { count: "exact" });
-  if (pipeline === "group-interview") {
+  if (pipeline === "round-1") {
     query = query.eq("app_status", "advanced");
+  } else if (pipeline === "round-2") {
+    query = query.eq("gi_status", "completed");
+  } else if (pipeline === "bbq-social") {
+    query = query.eq("social_status", "accepted");
   } else if (pipeline === "decisions") {
-    query = query.eq("cc_status", "completed");
+    query = query.eq("social_status", "accepted");
   }
   // "coffee-chats" has no stage gate: it's an early data-collection surface
-  // (before the group interview) where members log notes on any applicant.
+  // where members log notes on any applicant.
   if (listQuery.status) {
     query = query.eq("app_status", listQuery.status);
   }
   if (listQuery.gi_status) {
     query = query.eq("gi_status", listQuery.gi_status);
   }
+  if (listQuery.r2_status) {
+    query = query.eq("r2_status", listQuery.r2_status);
+  }
   if (listQuery.cc_status) {
     query = query.eq("cc_status", listQuery.cc_status);
+  }
+  if (listQuery.social_status) {
+    query = query.eq("social_status", listQuery.social_status);
   }
   if (listQuery.decision_status) {
     query = query.eq("decision_status", listQuery.decision_status);

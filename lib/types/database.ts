@@ -37,6 +37,12 @@ export type ApplicantRow = {
   cc_assigned_officer_name: string | null;
   cc_score: number | null;
   cc_notes: string;
+  /** Individual Round 2 (Round 1 reuses the gi_* fields above). */
+  r2_status: string;
+  r2_score: number | null;
+  r2_notes: string;
+  /** BBQ social — 'accepted' means they appear in the BBQ Social tab. */
+  social_status: string;
   decision_status: string;
   decision_notes: string;
 };
@@ -98,6 +104,8 @@ export type ListApplicantsQuery = {
   limit: number;
   offset: number;
   gi_status: string | null;
+  r2_status: string | null;
   cc_status: string | null;
+  social_status: string | null;
   decision_status: string | null;
 };

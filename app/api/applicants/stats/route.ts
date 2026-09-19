@@ -4,6 +4,14 @@ import { requireOfficer } from "@/lib/auth/session";
 
 import { createAdminClient } from "@/utils/supabase/admin";
 
+export type RoundStatusCounts = {
+  total: number;
+  pending: number;
+  scheduled: number;
+  completed: number;
+  rejected: number;
+};
+
 export type ApplicantStats = {
   total: number;
   byStatus: {
@@ -13,25 +21,19 @@ export type ApplicantStats = {
     rejected: number;
   };
   pipeline: {
-    groupInterview: number;
     coffeeChats: number;
+    round1: number;
+    round2: number;
+    bbqSocial: number;
     decisions: number;
     pendingDecisions: number;
   };
-  giByStatus: {
-    total: number;
-    pending: number;
-    scheduled: number;
-    completed: number;
-    rejected: number;
-  };
-  ccByStatus: {
-    total: number;
-    pending: number;
-    scheduled: number;
-    completed: number;
-    rejected: number;
-  };
+  /** Individual Round 1 (gi_*) status breakdown. */
+  r1ByStatus: RoundStatusCounts;
+  /** Individual Round 2 (r2_*) status breakdown. */
+  r2ByStatus: RoundStatusCounts;
+  /** Coffee-chat status breakdown (across all applicants). */
+  ccByStatus: RoundStatusCounts;
   pendingCoffeeChatRequests: number;
   recent: {
     id: string;
@@ -61,18 +63,6 @@ async function countWhere(
   return count ?? 0;
 }
 
-async function countPendingDecisions(
-  admin: ReturnType<typeof createAdminClient>,
-): Promise<number> {
-  const { count, error } = await admin
-    .from("applicants")
-    .select("id", { count: "exact", head: true })
-    .eq("cc_status", "completed")
-    .eq("decision_status", "pending");
-  if (error) throw error;
-  return count ?? 0;
-}
-
 async function countPendingCoffeeChatRequests(
   admin: ReturnType<typeof createAdminClient>,
 ): Promise<number> {
@@ -94,6 +84,22 @@ async function settledCount(
     console.warn(`[applicants/stats GET] ${label}:`, formatDbError(error));
     return 0;
   }
+}
+
+/** Status breakdown for a round, scoped by an upstream gate. */
+async function roundBreakdown(
+  admin: ReturnType<typeof createAdminClient>,
+  statusColumn: "gi_status" | "r2_status" | "cc_status",
+  gate: Record<string, string>,
+): Promise<RoundStatusCounts> {
+  const [total, pending, scheduled, completed, rejected] = await Promise.all([
+    settledCount(`${statusColumn}-total`, () => countWhere(admin, gate)),
+    settledCount(`${statusColumn}-pending`, () => countWhere(admin, { ...gate, [statusColumn]: "pending" })),
+    settledCount(`${statusColumn}-scheduled`, () => countWhere(admin, { ...gate, [statusColumn]: "scheduled" })),
+    settledCount(`${statusColumn}-completed`, () => countWhere(admin, { ...gate, [statusColumn]: "completed" })),
+    settledCount(`${statusColumn}-rejected`, () => countWhere(admin, { ...gate, [statusColumn]: "rejected" })),
+  ]);
+  return { total, pending, scheduled, completed, rejected };
 }
 
 export async function GET() {
@@ -119,14 +125,9 @@ export async function GET() {
       advancedCount,
       rejectedCount,
       recentResult,
-      giPending,
-      giScheduled,
-      giCompleted,
-      giRejected,
-      ccPending,
-      ccScheduled,
-      ccCompleted,
-      ccRejected,
+      r1ByStatus,
+      r2ByStatus,
+      ccByStatus,
     ] = await Promise.all([
       countWhere(admin, {}),
       countWhere(admin, { app_status: "new" }),
@@ -138,44 +139,20 @@ export async function GET() {
         .select("id, first_name, last_name, created_at")
         .order("created_at", { ascending: false })
         .limit(5),
-      settledCount("giPending", () =>
-        countWhere(admin, { app_status: "advanced", gi_status: "pending" }),
-      ),
-      settledCount("giScheduled", () =>
-        countWhere(admin, { app_status: "advanced", gi_status: "scheduled" }),
-      ),
-      settledCount("giCompleted", () =>
-        countWhere(admin, { app_status: "advanced", gi_status: "completed" }),
-      ),
-      settledCount("giRejected", () =>
-        countWhere(admin, { app_status: "advanced", gi_status: "rejected" }),
-      ),
-      settledCount("ccPending", () =>
-        countWhere(admin, { gi_status: "completed", cc_status: "pending" }),
-      ),
-      settledCount("ccScheduled", () =>
-        countWhere(admin, { gi_status: "completed", cc_status: "scheduled" }),
-      ),
-      settledCount("ccCompleted", () =>
-        countWhere(admin, { gi_status: "completed", cc_status: "completed" }),
-      ),
-      settledCount("ccRejected", () =>
-        countWhere(admin, { gi_status: "completed", cc_status: "rejected" }),
-      ),
+      roundBreakdown(admin, "gi_status", { app_status: "advanced" }),
+      roundBreakdown(admin, "r2_status", { gi_status: "completed" }),
+      roundBreakdown(admin, "cc_status", {}),
     ]);
 
     if (recentResult.error) throw recentResult.error;
 
-    const [groupInterview, coffeeChats, decisions, pendingDecisions, pendingRequests] =
-      await Promise.all([
-        settledCount("groupInterview", () => countWhere(admin, { app_status: "advanced" })),
-        settledCount("coffeeChats", () => countWhere(admin, { gi_status: "completed" })),
-        settledCount("decisions", () => countWhere(admin, { cc_status: "completed" })),
-        settledCount("pendingDecisions", () => countPendingDecisions(admin)),
-        settledCount("pendingCoffeeChatRequests", () =>
-          countPendingCoffeeChatRequests(admin),
-        ),
-      ]);
+    const [bbqSocial, pendingDecisions, pendingRequests] = await Promise.all([
+      settledCount("bbqSocial", () => countWhere(admin, { social_status: "accepted" })),
+      settledCount("pendingDecisions", () =>
+        countWhere(admin, { social_status: "accepted", decision_status: "pending" }),
+      ),
+      settledCount("pendingCoffeeChatRequests", () => countPendingCoffeeChatRequests(admin)),
+    ]);
 
     const stats: ApplicantStats = {
       total,
@@ -186,25 +163,16 @@ export async function GET() {
         rejected: rejectedCount,
       },
       pipeline: {
-        groupInterview,
-        coffeeChats,
-        decisions,
+        coffeeChats: total,
+        round1: r1ByStatus.total,
+        round2: r2ByStatus.total,
+        bbqSocial,
+        decisions: bbqSocial,
         pendingDecisions,
       },
-      giByStatus: {
-        total: groupInterview,
-        pending: giPending,
-        scheduled: giScheduled,
-        completed: giCompleted,
-        rejected: giRejected,
-      },
-      ccByStatus: {
-        total: coffeeChats,
-        pending: ccPending,
-        scheduled: ccScheduled,
-        completed: ccCompleted,
-        rejected: ccRejected,
-      },
+      r1ByStatus,
+      r2ByStatus,
+      ccByStatus,
       pendingCoffeeChatRequests: pendingRequests,
       recent: (recentResult.data ?? []).map((row) => ({
         id: row.id,

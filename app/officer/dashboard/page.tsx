@@ -76,17 +76,19 @@ function ClockIcon({ className }: { className?: string }) {
 // --- Pipeline & quick-action config ---
 
 const PIPELINE_STAGES = [
-  { stage: "Applications",    key: "applications" as const,    href: "/officer/dashboard/applications",   icon: <FileTextIcon />,    color: "text-violet-600", bg: "bg-violet-50",  border: "border-violet-200" },
-  { stage: "Coffee Chats",    key: "coffeeChats" as const,    href: "/officer/dashboard/coffee-chats",    icon: <CoffeeIcon />,      color: "text-amber-600",  bg: "bg-amber-50",   border: "border-amber-200" },
-  { stage: "Group Interview", key: "groupInterview" as const, href: "/officer/dashboard/group-interview", icon: <UsersIcon />,       color: "text-blue-600",   bg: "bg-blue-50",    border: "border-blue-200" },
-  { stage: "Decisions",       key: "decisions" as const,       href: "/officer/dashboard/decisions",       icon: <CheckSquareIcon />, color: "text-green-600",  bg: "bg-green-50",   border: "border-green-200" },
+  { stage: "Applications", key: "applications" as const, href: "/officer/dashboard/applications", icon: <FileTextIcon />,    color: "text-violet-600", bg: "bg-violet-50", border: "border-violet-200" },
+  { stage: "Coffee Chats", key: "coffeeChats" as const,  href: "/officer/dashboard/coffee-chats", icon: <CoffeeIcon />,      color: "text-amber-600",  bg: "bg-amber-50",  border: "border-amber-200" },
+  { stage: "Round 1",      key: "round1" as const,       href: "/officer/dashboard/round-1",      icon: <UsersIcon />,       color: "text-blue-600",   bg: "bg-blue-50",   border: "border-blue-200" },
+  { stage: "Round 2",      key: "round2" as const,       href: "/officer/dashboard/round-2",      icon: <UsersIcon />,       color: "text-indigo-600", bg: "bg-indigo-50", border: "border-indigo-200" },
+  { stage: "BBQ Social",   key: "bbqSocial" as const,    href: "/officer/dashboard/bbq-social",   icon: <CoffeeIcon />,      color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200" },
+  { stage: "Decisions",    key: "decisions" as const,    href: "/officer/dashboard/decisions",    icon: <CheckSquareIcon />, color: "text-green-600",  bg: "bg-green-50",  border: "border-green-200" },
 ];
 
 const QUICK_ACTIONS = [
-  { label: "Review Applications",    subtitle: "Manage submitted applications",   href: "/officer/dashboard/applications",   icon: <FileTextIcon />,    iconBg: "bg-violet-50", iconColor: "text-violet-600" },
-  { label: "Coffee Chat Notes",      subtitle: "Log notes on applicants you chat", href: "/officer/dashboard/coffee-chats",    icon: <CoffeeIcon />,      iconBg: "bg-amber-50",  iconColor: "text-amber-600" },
-  { label: "Manage Group Interview", subtitle: "Assign sessions & score applicants", href: "/officer/dashboard/group-interview", icon: <UsersIcon />,       iconBg: "bg-blue-50",   iconColor: "text-blue-600" },
-  { label: "Finalize Decisions",     subtitle: "Send acceptance & rejection offers", href: "/officer/dashboard/decisions",       icon: <CheckSquareIcon />, iconBg: "bg-green-50",  iconColor: "text-green-600" },
+  { label: "Review Applications", subtitle: "Manage submitted applications",     href: "/officer/dashboard/applications", icon: <FileTextIcon />,    iconBg: "bg-violet-50", iconColor: "text-violet-600" },
+  { label: "Coffee Chat Notes",   subtitle: "Log notes on applicants you chat",  href: "/officer/dashboard/coffee-chats", icon: <CoffeeIcon />,      iconBg: "bg-amber-50",  iconColor: "text-amber-600" },
+  { label: "Individual Rounds",   subtitle: "Score Round 1 & Round 2 interviews", href: "/officer/dashboard/round-1",     icon: <UsersIcon />,       iconBg: "bg-blue-50",   iconColor: "text-blue-600" },
+  { label: "Finalize Decisions",  subtitle: "Send acceptance & rejection offers", href: "/officer/dashboard/decisions",    icon: <CheckSquareIcon />, iconBg: "bg-green-50",  iconColor: "text-green-600" },
 ];
 
 // --- Page ---
@@ -94,8 +96,10 @@ const QUICK_ACTIONS = [
 function pipelineCounts(stats: ApplicantStats | null) {
   return {
     applications: stats?.total ?? 0,
-    groupInterview: stats?.pipeline.groupInterview ?? 0,
     coffeeChats: stats?.pipeline.coffeeChats ?? 0,
+    round1: stats?.pipeline.round1 ?? 0,
+    round2: stats?.pipeline.round2 ?? 0,
+    bbqSocial: stats?.pipeline.bbqSocial ?? 0,
     decisions: stats?.pipeline.decisions ?? 0,
   };
 }
@@ -236,16 +240,16 @@ export default function OfficerDashboardHome() {
           {/* Upcoming Sessions */}
           <div className="bg-white border border-[#e4e4e7] rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-[#374151]">Upcoming GI Sessions</h2>
-              <Link href="/officer/dashboard/group-interview" className="text-xs font-medium text-[#061c2a] hover:underline flex items-center gap-1">
+              <h2 className="text-sm font-semibold text-[#374151]">Individual Rounds</h2>
+              <Link href="/officer/dashboard/round-1" className="text-xs font-medium text-[#061c2a] hover:underline flex items-center gap-1">
                 View all <ArrowRightIcon />
               </Link>
             </div>
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <UsersIcon className="text-[#d4d4d8] mb-2" />
-              <p className="text-sm text-[#6b7280]">No sessions scheduled yet.</p>
-              <Link href="/officer/dashboard/group-interview" className="mt-2 text-xs font-medium text-[#061c2a] hover:underline">
-                Set up Group Interview →
+              <p className="text-sm text-[#6b7280]">Score applicants across two 1-on-1 rounds.</p>
+              <Link href="/officer/dashboard/round-1" className="mt-2 text-xs font-medium text-[#061c2a] hover:underline">
+                Go to Round 1 →
               </Link>
             </div>
           </div>

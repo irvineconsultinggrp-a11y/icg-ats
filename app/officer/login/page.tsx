@@ -27,7 +27,14 @@ export default function OfficerLogin() {
 
     if (signInError) {
       setLoading(false);
-      setError(signInError.message);
+      const notConfirmed = /email not confirmed|not confirmed|confirm your email/i.test(
+        signInError.message,
+      );
+      setError(
+        notConfirmed
+          ? "Please confirm your email first — check your inbox for the confirmation link we sent when you signed up."
+          : signInError.message,
+      );
       return;
     }
 

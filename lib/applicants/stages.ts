@@ -2,14 +2,22 @@ import type { ApplicantRow } from "@/lib/types/database";
 
 export type PipelineStage =
   | "applications"
-  | "group-interview"
   | "coffee-chats"
+  | "round-1"
+  | "round-2"
+  | "bbq-social"
   | "decisions";
 
 export type AppStatus = "new" | "reviewing" | "advanced" | "rejected";
-export type GIStatus = "pending" | "scheduled" | "completed" | "rejected";
+/** Round status — used by both individual rounds (Round 1 = gi_*, Round 2 = r2_*). */
+export type RoundStatus = "pending" | "scheduled" | "completed" | "rejected";
+export type GIStatus = RoundStatus;
 export type CCStatus = "pending" | "scheduled" | "completed" | "rejected";
+export type SocialStatus = "pending" | "accepted" | "rejected";
 export type DecisionStatus = "pending" | "accepted" | "rejected";
+
+/** Which round a board is showing. Round 1 persists to gi_*, Round 2 to r2_*. */
+export type RoundKey = 1 | 2;
 
 export type OfficerApplicantPatch = {
   app_status?: AppStatus;
@@ -25,12 +33,18 @@ export type OfficerApplicantPatch = {
   cc_assigned_officer_name?: string | null;
   cc_score?: number | null;
   cc_notes?: string;
+  r2_status?: RoundStatus;
+  r2_score?: number | null;
+  r2_notes?: string;
+  social_status?: SocialStatus;
   decision_status?: DecisionStatus;
   decision_notes?: string;
 };
 
 const GI_STATUSES = new Set<GIStatus>(["pending", "scheduled", "completed", "rejected"]);
+const R2_STATUSES = new Set<RoundStatus>(["pending", "scheduled", "completed", "rejected"]);
 const CC_STATUSES = new Set<CCStatus>(["pending", "scheduled", "completed", "rejected"]);
+const SOCIAL_STATUSES = new Set<SocialStatus>(["pending", "accepted", "rejected"]);
 const DECISION_STATUSES = new Set<DecisionStatus>(["pending", "accepted", "rejected"]);
 const APP_STATUSES = new Set<AppStatus>(["new", "reviewing", "advanced", "rejected"]);
 
@@ -106,6 +120,31 @@ export function parseOfficerApplicantPatch(
     if (typeof body.cc_notes !== "string") return { error: "Invalid cc_notes" };
     patch.cc_notes = body.cc_notes;
   }
+  if (body.r2_status !== undefined) {
+    if (typeof body.r2_status !== "string" || !R2_STATUSES.has(body.r2_status as RoundStatus)) {
+      return { error: "Invalid r2_status" };
+    }
+    patch.r2_status = body.r2_status as RoundStatus;
+  }
+  if (body.r2_score !== undefined) {
+    patch.r2_score = body.r2_score === null ? null : Number(body.r2_score);
+    if (patch.r2_score !== null && !Number.isFinite(patch.r2_score)) {
+      return { error: "Invalid r2_score" };
+    }
+  }
+  if (body.r2_notes !== undefined) {
+    if (typeof body.r2_notes !== "string") return { error: "Invalid r2_notes" };
+    patch.r2_notes = body.r2_notes;
+  }
+  if (body.social_status !== undefined) {
+    if (
+      typeof body.social_status !== "string" ||
+      !SOCIAL_STATUSES.has(body.social_status as SocialStatus)
+    ) {
+      return { error: "Invalid social_status" };
+    }
+    patch.social_status = body.social_status as SocialStatus;
+  }
   if (body.decision_status !== undefined) {
     if (
       typeof body.decision_status !== "string" ||
@@ -120,8 +159,9 @@ export function parseOfficerApplicantPatch(
     patch.decision_notes = body.decision_notes;
   }
 
-  if (patch.gi_status === "completed" && patch.cc_status === undefined) {
-    patch.cc_status = "pending";
+  // Completing Round 1 moves the applicant into Round 2 (pending).
+  if (patch.gi_status === "completed" && patch.r2_status === undefined) {
+    patch.r2_status = "pending";
   }
 
   if (Object.keys(patch).length === 0) {
@@ -153,6 +193,58 @@ export function rowToGroupInterview(row: ApplicantRow) {
   };
 }
 
+/** Map a row to an individual-round card. Round 1 reads gi_*, Round 2 reads r2_*. */
+export function rowToRound(row: ApplicantRow, round: RoundKey) {
+  const status = round === 1 ? row.gi_status : row.r2_status;
+  const score = round === 1 ? row.gi_score : row.r2_score;
+  const notes = round === 1 ? row.gi_notes : row.r2_notes;
+  return {
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    year: row.grad_year ?? 0,
+    major: row.majors ?? "—",
+    gpa: row.gpa ?? "—",
+    position: row.position,
+    status: (status ?? "pending") as RoundStatus,
+    score: score ?? null,
+    notes: notes ?? "",
+  };
+}
+
+export function roundToPatch(
+  round: RoundKey,
+  patch: Partial<{ status: RoundStatus; score: number | null; notes: string }>,
+): OfficerApplicantPatch {
+  const out: OfficerApplicantPatch = {};
+  if (round === 1) {
+    if (patch.status !== undefined) out.gi_status = patch.status;
+    if (patch.score !== undefined) out.gi_score = patch.score;
+    if (patch.notes !== undefined) out.gi_notes = patch.notes;
+  } else {
+    if (patch.status !== undefined) out.r2_status = patch.status;
+    if (patch.score !== undefined) out.r2_score = patch.score;
+    if (patch.notes !== undefined) out.r2_notes = patch.notes;
+  }
+  return out;
+}
+
+/** BBQ social attendee — applicants with social_status = 'accepted'. */
+export function rowToBbqAttendee(row: ApplicantRow) {
+  return {
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    year: row.grad_year ?? 0,
+    major: row.majors ?? "—",
+    position: row.position,
+    r1Score: row.gi_score ?? null,
+    r2Score: row.r2_score ?? null,
+  };
+}
+
 export function rowToCoffeeChat(row: ApplicantRow) {
   return {
     id: row.id,
@@ -180,8 +272,8 @@ export function rowToDecision(row: ApplicantRow) {
     year: row.grad_year ?? 0,
     major: row.majors ?? "—",
     gpa: row.gpa ?? "—",
-    giScore: row.gi_score ?? null,
-    ccScore: row.cc_score ?? null,
+    r1Score: row.gi_score ?? null,
+    r2Score: row.r2_score ?? null,
     status: (row.decision_status as DecisionStatus) || "pending",
     notes: row.decision_notes ?? "",
   };
@@ -226,7 +318,9 @@ export type FetchApplicantsOptions = {
   search?: string;
   appStatus?: string;
   giStatus?: string;
+  r2Status?: string;
   ccStatus?: string;
+  socialStatus?: string;
   decisionStatus?: string;
   limit?: number;
   offset?: number;
@@ -244,8 +338,14 @@ export async function fetchApplicantsList(
   if (options.giStatus && options.giStatus !== "all") {
     params.set("gi_status", options.giStatus);
   }
+  if (options.r2Status && options.r2Status !== "all") {
+    params.set("r2_status", options.r2Status);
+  }
   if (options.ccStatus && options.ccStatus !== "all") {
     params.set("cc_status", options.ccStatus);
+  }
+  if (options.socialStatus && options.socialStatus !== "all") {
+    params.set("social_status", options.socialStatus);
   }
   if (options.decisionStatus && options.decisionStatus !== "all") {
     params.set("decision_status", options.decisionStatus);

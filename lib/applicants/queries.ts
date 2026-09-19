@@ -65,10 +65,22 @@ export function parseListApplicantsQuery(
       ? giStatusRaw.trim()
       : null;
 
+  const r2StatusRaw = searchParams.get("r2_status");
+  const r2_status =
+    r2StatusRaw && r2StatusRaw !== "all" && r2StatusRaw.trim().length > 0
+      ? r2StatusRaw.trim()
+      : null;
+
   const ccStatusRaw = searchParams.get("cc_status");
   const cc_status =
     ccStatusRaw && ccStatusRaw !== "all" && ccStatusRaw.trim().length > 0
       ? ccStatusRaw.trim()
+      : null;
+
+  const socialStatusRaw = searchParams.get("social_status");
+  const social_status =
+    socialStatusRaw && socialStatusRaw !== "all" && socialStatusRaw.trim().length > 0
+      ? socialStatusRaw.trim()
       : null;
 
   const decisionStatusRaw = searchParams.get("decision_status");
@@ -88,7 +100,9 @@ export function parseListApplicantsQuery(
     limit,
     offset,
     gi_status,
+    r2_status,
     cc_status,
+    social_status,
     decision_status,
   };
 }

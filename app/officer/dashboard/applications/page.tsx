@@ -284,7 +284,7 @@ function DetailPanel({
             onClick={() => onUpdate({ status: "advanced" })}
             className="flex items-center justify-center h-11 w-full bg-[#061c2a] text-white text-sm font-medium rounded-lg hover:bg-[#0d2f47] transition-colors"
           >
-            Advance to Group Interview
+            Advance to Coffee Chats
           </button>
           <button
             type="button"
@@ -337,19 +337,19 @@ export default function ApplicationsPage() {
     setPage(0);
   }, [debouncedSearch, activeTab]);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const res = await fetch("/api/applicants/stats", { credentials: "include" });
-        const body = (await res.json()) as { data?: ApplicantStats };
-        if (res.ok && body.data) {
-          setStatusCounts(body.data.byStatus);
-        }
-      } catch {
-        setStatusCounts(null);
-      }
-    })();
+  const loadCounts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/applicants/stats", { credentials: "include" });
+      const body = (await res.json()) as { data?: ApplicantStats };
+      if (res.ok && body.data) setStatusCounts(body.data.byStatus);
+    } catch {
+      setStatusCounts(null);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadCounts();
+  }, [loadCounts]);
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -432,6 +432,15 @@ export default function ApplicationsPage() {
       setApplications((prev) =>
         prev.map((a) => (a.id === id ? rowToApplication(body.data!) : a)),
       );
+      // A status change moves the applicant between tabs — refresh the counts and,
+      // if a specific tab is active, re-fetch so the applicant drops out of the wrong tab.
+      if (patch.status !== undefined) {
+        void loadCounts();
+        if (activeTab !== "all") {
+          setSelectedId(null);
+          void loadApplications();
+        }
+      }
     } catch {
       setApplications(previous);
       setSaveError("Network error saving changes.");

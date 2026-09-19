@@ -1,8 +1,8 @@
 # ICG ATS — Recruitment Portal
 
 Applicant tracking system for Irvine Consulting Group. Applicants apply and track their
-status; officers manage the recruitment pipeline (Applications → Coffee Chats → Group
-Interview → Decisions), log per-applicant notes, and make offers.
+status; officers manage the recruitment pipeline (Applications → Coffee Chats → Round 1 →
+Round 2 → BBQ Social → Decisions), log per-applicant notes, and make offers.
 
 **Stack:** Next.js 16 (App Router) · React 19 · Supabase (Auth, Postgres + RLS, Storage) · Tailwind v4.
 
@@ -37,6 +37,7 @@ the Supabase SQL Editor (Dashboard → SQL Editor → New query):
 4. `20250520120003_pipeline_coffee_chats.sql` — pipeline fields + coffee-chat requests
 5. `20250520120004_performance_indexes.sql`
 6. `20250520120005_applicant_notes.sql` — per-applicant notes folder
+7. `20250520120006_individual_rounds_social.sql` — Round 2 + BBQ Social pipeline columns
 
 Every migration is idempotent, so re-running is safe.
 
@@ -76,6 +77,7 @@ npm run lint    # eslint
 
 ## Recruitment pipeline
 
-**Applications → Coffee Chats → Group Interview → Decisions.** Coffee Chats is an early
+**Applications → Coffee Chats → Round 1 → Round 2 → BBQ Social → Decisions.** Round 1
+reuses the legacy `gi_*` columns (formerly group interview). Coffee Chats is an early
 data-collection stage: any officer can open an applicant and keep their own attributed,
 rich-text note in that applicant's shared notes folder.

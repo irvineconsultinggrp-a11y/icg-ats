@@ -233,18 +233,34 @@ function ProfileModal({
 
             <p className="text-sm text-[#374151] leading-relaxed">{member.bio}</p>
 
-            <div className="flex flex-wrap gap-2">
-              {member.interests.map((interest) => (
-                <button
-                  key={interest}
-                  type="button"
-                  onClick={() => { onTagSearch?.(interest); handleClose(); }}
-                  className="inline-flex items-center h-7 px-3 bg-[#f4f4f5] rounded-full text-xs font-medium text-[#374151] hover:bg-[#061c2a] hover:text-white transition-colors"
-                  title={`Filter by "${interest}"`}
-                >
-                  {interest}
-                </button>
-              ))}
+            <div className="flex flex-col divide-y divide-[#f1f1f2] rounded-xl border border-[#ececee] bg-[#fafafa] overflow-hidden">
+              <div className="flex items-center justify-between gap-4 px-4 py-2.5">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[#a1a1aa]">Major</span>
+                <span className="text-sm font-medium text-[#111827] text-right">{member.major}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4 px-4 py-2.5">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[#a1a1aa]">Graduation</span>
+                <span className="text-sm font-medium text-[#111827] text-right">
+                  {member.graduationYear ? `Class of ${member.graduationYear}` : "—"}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-[#a1a1aa]">Interests</span>
+              <div className="flex flex-wrap gap-2">
+                {member.interests.map((interest) => (
+                  <button
+                    key={interest}
+                    type="button"
+                    onClick={() => { onTagSearch?.(interest); handleClose(); }}
+                    className="inline-flex items-center h-7 px-3 bg-white border border-[#e4e4e7] rounded-full text-xs font-medium text-[#374151] hover:bg-[#061c2a] hover:text-white hover:border-[#061c2a] transition-colors"
+                    title={`Filter by "${interest}"`}
+                  >
+                    {interest}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <button
@@ -267,6 +283,7 @@ const TABS = [
   { key: "all", label: "All Members", icon: <UserCircleIcon /> },
   { key: "executive", label: "Executives", icon: <BriefcaseIcon /> },
   { key: "director", label: "Directors", icon: <MegaphoneIcon /> },
+  { key: "member", label: "Consultants", icon: <UsersIcon /> },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -331,6 +348,7 @@ export default function CoffeeChatsPage() {
       all: MEMBERS.length,
       executive: MEMBERS.filter((m) => m.category === "executive").length,
       director: MEMBERS.filter((m) => m.category === "director").length,
+      member: MEMBERS.filter((m) => m.category === "member").length,
     }),
     [],
   );
