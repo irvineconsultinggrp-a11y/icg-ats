@@ -101,33 +101,37 @@ function MemberCard({
       <button
         type="button"
         onClick={() => onLearnMore(member)}
-        className="group relative w-[120px] h-[120px] rounded-full overflow-hidden flex-shrink-0 ring-2 ring-[#e4e4e7] ring-offset-2 hover:ring-[#061c2a] cursor-pointer transition-all duration-200"
+        className="flex flex-col items-center gap-4 w-full rounded-lg cursor-pointer group/card focus:outline-none focus-visible:ring-2 focus-visible:ring-[#061c2a]/30"
         aria-label={`View ${member.name}'s profile`}
       >
-        {!imgError ? (
-          <Image
-            src={member.photo}
-            alt={member.name}
-            fill
-            sizes="120px"
-            loading="lazy"
-            className="object-cover object-top group-hover:scale-105 transition-transform duration-200"
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <div className="w-full h-full bg-[#061c2a] flex items-center justify-center text-white text-2xl font-bold">
-            {initials}
-          </div>
-        )}
-        <div className="absolute inset-0 bg-[#061c2a]/0 group-hover:bg-[#061c2a]/30 transition-colors duration-200 flex items-center justify-center">
-          <span className="text-white text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity duration-200">View</span>
-        </div>
-      </button>
+        <span className="relative w-[120px] h-[120px] rounded-full overflow-hidden flex-shrink-0 ring-2 ring-[#e4e4e7] ring-offset-2 group-hover/card:ring-[#061c2a] transition-all duration-200">
+          {!imgError ? (
+            <Image
+              src={member.photo}
+              alt=""
+              fill
+              sizes="120px"
+              loading="lazy"
+              className="object-cover object-top group-hover/card:scale-105 transition-transform duration-200"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <span className="absolute inset-0 bg-[#061c2a] flex items-center justify-center text-white text-2xl font-bold">
+              {initials}
+            </span>
+          )}
+          <span className="absolute inset-0 bg-[#061c2a]/0 group-hover/card:bg-[#061c2a]/30 transition-colors duration-200 flex items-center justify-center">
+            <span className="text-white text-xs font-semibold opacity-0 group-hover/card:opacity-100 transition-opacity duration-200">View</span>
+          </span>
+        </span>
 
-      <div className="text-center">
-        <p className="font-semibold text-[15px] text-[#111827] leading-tight">{member.name}</p>
-        <p className="text-sm text-[#6b7280] mt-1">{member.role}</p>
-      </div>
+        <span className="text-center">
+          <span className="block font-semibold text-[15px] text-[#111827] leading-tight group-hover/card:text-[#061c2a] transition-colors">
+            {member.name}
+          </span>
+          <span className="block text-sm text-[#6b7280] mt-1">{member.role}</span>
+        </span>
+      </button>
 
       <div className="flex gap-2 w-full">
         <button

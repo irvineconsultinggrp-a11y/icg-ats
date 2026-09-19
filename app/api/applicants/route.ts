@@ -25,6 +25,8 @@ export async function GET(request: Request) {
   const pipelineParam = url.searchParams.get("pipeline");
   const pipeline: ApplicantPipelineParam =
     pipelineParam === "coffee-chats" ||
+    pipelineParam === "interview-schedule" ||
+    pipelineParam === "interview-schedule-round-2" ||
     pipelineParam === "round-1" ||
     pipelineParam === "round-2" ||
     pipelineParam === "bbq-social" ||
@@ -36,8 +38,10 @@ export async function GET(request: Request) {
   const columns = selectColumnsForPipeline(pipeline);
 
   let query = admin.from("applicants").select(columns, { count: "exact" });
-  if (pipeline === "round-1") {
+  if (pipeline === "interview-schedule" || pipeline === "round-1") {
     query = query.eq("app_status", "advanced");
+  } else if (pipeline === "interview-schedule-round-2") {
+    query = query.eq("gi_status", "completed");
   } else if (pipeline === "round-2") {
     query = query.eq("gi_status", "completed");
   } else if (pipeline === "bbq-social") {

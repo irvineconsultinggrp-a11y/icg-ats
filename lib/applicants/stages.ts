@@ -3,6 +3,8 @@ import type { ApplicantRow } from "@/lib/types/database";
 export type PipelineStage =
   | "applications"
   | "coffee-chats"
+  | "interview-schedule"
+  | "interview-schedule-round-2"
   | "round-1"
   | "round-2"
   | "bbq-social"
@@ -34,6 +36,7 @@ export type OfficerApplicantPatch = {
   cc_score?: number | null;
   cc_notes?: string;
   r2_status?: RoundStatus;
+  r2_session_id?: string | null;
   r2_score?: number | null;
   r2_notes?: string;
   social_status?: SocialStatus;
@@ -126,6 +129,10 @@ export function parseOfficerApplicantPatch(
     }
     patch.r2_status = body.r2_status as RoundStatus;
   }
+  if (body.r2_session_id !== undefined) {
+    patch.r2_session_id =
+      body.r2_session_id === null ? null : String(body.r2_session_id);
+  }
   if (body.r2_score !== undefined) {
     patch.r2_score = body.r2_score === null ? null : Number(body.r2_score);
     if (patch.r2_score !== null && !Number.isFinite(patch.r2_score)) {
@@ -191,6 +198,54 @@ export function rowToGroupInterview(row: ApplicantRow) {
     score: row.gi_score ?? null,
     notes: row.gi_notes ?? "",
   };
+}
+
+/** Officer interview scheduler row (Round 1 → gi_*, Round 2 → r2_*). */
+export function rowToInterviewSchedule(row: ApplicantRow, round: RoundKey) {
+  const assignedSlot =
+    round === 1 ? (row.gi_session_id ?? null) : (row.r2_session_id ?? null);
+  const status = round === 1 ? row.gi_status : row.r2_status;
+  const score = round === 1 ? row.gi_score : row.r2_score;
+  const notes = round === 1 ? row.gi_notes : row.r2_notes;
+  return {
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    year: row.grad_year ?? 0,
+    major: row.majors ?? "—",
+    gpa: row.gpa ?? "—",
+    position: row.position,
+    availableSlots: parseAvailableSlots(row),
+    assignedSlot,
+    status: (status ?? "pending") as RoundStatus,
+    score: score ?? null,
+    notes: notes ?? "",
+  };
+}
+
+export function interviewScheduleToPatch(
+  round: RoundKey,
+  patch: Partial<{
+    assignedSlot: string | null;
+    status: RoundStatus;
+    score: number | null;
+    notes: string;
+  }>,
+): OfficerApplicantPatch {
+  const out: OfficerApplicantPatch = {};
+  if (round === 1) {
+    if (patch.status !== undefined) out.gi_status = patch.status;
+    if (patch.assignedSlot !== undefined) out.gi_session_id = patch.assignedSlot;
+    if (patch.score !== undefined) out.gi_score = patch.score;
+    if (patch.notes !== undefined) out.gi_notes = patch.notes;
+  } else {
+    if (patch.status !== undefined) out.r2_status = patch.status;
+    if (patch.assignedSlot !== undefined) out.r2_session_id = patch.assignedSlot;
+    if (patch.score !== undefined) out.r2_score = patch.score;
+    if (patch.notes !== undefined) out.r2_notes = patch.notes;
+  }
+  return out;
 }
 
 /** Map a row to an individual-round card. Round 1 reads gi_*, Round 2 reads r2_*. */

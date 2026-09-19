@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireOfficer } from "@/lib/auth/session";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { parseNoteSignal } from "@/lib/applicants/note-signal";
 import { sanitizeNoteHtml, noteTextLength } from "@/lib/applicants/sanitize-html";
 
 const NOTE_COLUMNS =
-  "id, applicant_id, author_user_id, author_name, title, body_html, created_at, updated_at";
+  "id, applicant_id, author_user_id, author_name, title, body_html, signal, created_at, updated_at";
 
 type RouteContext = { params: Promise<{ id: string; noteId: string }> };
 
@@ -15,9 +16,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   const gate = await requireOfficer();
   if ("response" in gate) return gate.response;
 
-  let body: { title?: string; bodyHtml?: string };
+  let body: { title?: string; bodyHtml?: string; signal?: string | null };
   try {
-    body = (await request.json()) as { title?: string; bodyHtml?: string };
+    body = (await request.json()) as { title?: string; bodyHtml?: string; signal?: string | null };
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -35,11 +36,24 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "You can only edit your own notes." }, { status: 403 });
   }
 
-  const patch: { title?: string; body_html?: string; updated_at: string } = {
+  const patch: {
+    title?: string;
+    body_html?: string;
+    signal?: string | null;
+    updated_at: string;
+  } = {
     updated_at: new Date().toISOString(),
   };
   if (typeof body.title === "string") patch.title = body.title.trim().slice(0, 200);
   if (typeof body.bodyHtml === "string") patch.body_html = sanitizeNoteHtml(body.bodyHtml);
+  if (body.signal !== undefined) {
+    if (body.signal === null) patch.signal = null;
+    else {
+      const parsed = parseNoteSignal(body.signal);
+      if (!parsed) return NextResponse.json({ error: "Invalid signal." }, { status: 400 });
+      patch.signal = parsed;
+    }
+  }
 
   const nextTitle = patch.title ?? "";
   const nextBody = patch.body_html ?? "";

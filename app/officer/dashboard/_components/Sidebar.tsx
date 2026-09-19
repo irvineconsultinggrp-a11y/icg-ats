@@ -68,6 +68,7 @@ type OfficerNav =
   | "home"
   | "applications"
   | "coffee-chats"
+  | "interview-schedule"
   | "round-1"
   | "round-2"
   | "bbq-social"
@@ -77,6 +78,7 @@ function getActiveNav(pathname: string): OfficerNav {
   if (pathname === "/officer/dashboard") return "home";
   if (pathname.includes("/applications")) return "applications";
   if (pathname.includes("/coffee-chats")) return "coffee-chats";
+  if (pathname.includes("/interview-schedule")) return "interview-schedule";
   if (pathname.includes("/round-1")) return "round-1";
   if (pathname.includes("/round-2")) return "round-2";
   if (pathname.includes("/bbq-social")) return "bbq-social";
@@ -92,6 +94,7 @@ export function Sidebar() {
     { key: "home",         label: "Home",         icon: <HouseIcon />,       href: "/officer/dashboard" },
     { key: "applications", label: "Applications", icon: <FileTextIcon />,    href: "/officer/dashboard/applications" },
     { key: "coffee-chats", label: "Coffee Chats", icon: <CoffeeIcon />,      href: "/officer/dashboard/coffee-chats" },
+    { key: "interview-schedule", label: "Interview Schedule", icon: <UsersIcon />, href: "/officer/dashboard/interview-schedule" },
     { key: "round-1",      label: "Round 1",      icon: <UsersIcon />,       href: "/officer/dashboard/round-1" },
     { key: "round-2",      label: "Round 2",      icon: <UsersIcon />,       href: "/officer/dashboard/round-2" },
     { key: "bbq-social",   label: "BBQ Social",   icon: <FireIcon />,        href: "/officer/dashboard/bbq-social" },

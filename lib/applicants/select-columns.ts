@@ -7,6 +7,14 @@ export const APPLICANT_LIST_COLUMNS =
 export const APPLICANT_ROUND1_COLUMNS =
   "id, first_name, last_name, email, grad_year, majors, gpa, position, gi_status, gi_score, gi_notes";
 
+/** Officer interview scheduler (availability + room/time assignment). */
+export const APPLICANT_INTERVIEW_SCHEDULE_COLUMNS =
+  "id, first_name, last_name, email, grad_year, majors, gpa, position, available_slots, gi_session_id, gi_status, gi_score, gi_notes";
+
+/** Officer Round 2 interview scheduler. */
+export const APPLICANT_INTERVIEW_SCHEDULE_R2_COLUMNS =
+  "id, first_name, last_name, email, grad_year, majors, gpa, position, available_slots, r2_session_id, r2_status, r2_score, r2_notes";
+
 /** Individual Round 2. */
 export const APPLICANT_ROUND2_COLUMNS =
   "id, first_name, last_name, email, grad_year, majors, gpa, position, r2_status, r2_score, r2_notes";
@@ -26,6 +34,8 @@ export const APPLICANT_MINE_LIST_COLUMNS =
 
 export type ApplicantPipelineParam =
   | "coffee-chats"
+  | "interview-schedule"
+  | "interview-schedule-round-2"
   | "round-1"
   | "round-2"
   | "bbq-social"
@@ -36,6 +46,10 @@ export function selectColumnsForPipeline(
   pipeline: ApplicantPipelineParam,
 ): string {
   switch (pipeline) {
+    case "interview-schedule":
+      return APPLICANT_INTERVIEW_SCHEDULE_COLUMNS;
+    case "interview-schedule-round-2":
+      return APPLICANT_INTERVIEW_SCHEDULE_R2_COLUMNS;
     case "round-1":
       return APPLICANT_ROUND1_COLUMNS;
     case "round-2":

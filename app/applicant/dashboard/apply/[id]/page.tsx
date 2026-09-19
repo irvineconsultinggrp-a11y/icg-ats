@@ -105,10 +105,9 @@ function TextArea({
 
 // --- Tab types ---
 
-type Tab = "profile" | "short-answer" | "availability";
+type Tab = "information" | "availability";
 const TABS: { key: Tab; label: string }[] = [
-  { key: "profile", label: "Profile" },
-  { key: "short-answer", label: "Short Answer" },
+  { key: "information", label: "Information" },
   { key: "availability", label: "Availability" },
 ];
 
@@ -121,7 +120,7 @@ export default function ApplicationForm() {
   const position = getPositionById(positionId);
   const positionTitle = position?.title ?? formatPositionTitle(positionId);
 
-  const [activeTab, setActiveTab] = useState<Tab>("profile");
+  const [activeTab, setActiveTab] = useState<Tab>("information");
   const [loadingApplication, setLoadingApplication] = useState(true);
   const [applicationId, setApplicationId] = useState<string | null>(null);
   const [readOnly, setReadOnly] = useState(false);
@@ -136,8 +135,6 @@ export default function ApplicationForm() {
   const [majors, setMajors] = useState("");
   const [minors, setMinors] = useState("");
 
-  // Short answer fields
-  const [careerGoals, setCareerGoals] = useState("");
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [commitments, setCommitments] = useState("");
   const [infoSession, setInfoSession] = useState("");
@@ -182,7 +179,6 @@ export default function ApplicationForm() {
           setPhone(hydrated.phone);
           setMajors(hydrated.majors);
           setMinors(hydrated.minors);
-          setCareerGoals(hydrated.careerGoals);
           setLinkedinUrl(hydrated.linkedinUrl);
           setCommitments(hydrated.commitments);
           setInfoSession(hydrated.infoSession);
@@ -212,7 +208,6 @@ export default function ApplicationForm() {
     formData.set("phone", phone);
     formData.set("majors", majors);
     formData.set("minors", minors);
-    formData.set("careerGoals", careerGoals);
     formData.set("linkedinUrl", linkedinUrl);
     formData.set("commitments", commitments);
     formData.set("infoSession", infoSession);
@@ -376,10 +371,9 @@ export default function ApplicationForm() {
 
           {/* Tab content */}
           <fieldset disabled={readOnly} className="contents min-w-0">
-          {activeTab === "profile" && (
+          {activeTab === "information" && (
             <div className="bg-white border border-[#e4e4e7] rounded-md p-8">
               <div className="flex flex-col gap-[46px]">
-                {/* Row 1: First Name + Last Name */}
                 <div className="flex gap-[35px]">
                   <div className="flex-1 flex flex-col gap-1.5">
                     <FieldLabel htmlFor="firstName" required>First Name</FieldLabel>
@@ -391,13 +385,11 @@ export default function ApplicationForm() {
                   </div>
                 </div>
 
-                {/* Row 2: Email */}
                 <div className="flex flex-col gap-1.5">
                   <FieldLabel htmlFor="email" required>Email</FieldLabel>
                   <TextInput id="email" type="email" placeholder="Enter Email" value={email} onChange={setEmail} />
                 </div>
 
-                {/* Row 3: Grad Year + Phone */}
                 <div className="flex gap-[35px]">
                   <div className="flex-1 flex flex-col gap-1.5">
                     <FieldLabel htmlFor="gradYear">Grad Year</FieldLabel>
@@ -436,7 +428,6 @@ export default function ApplicationForm() {
                   </div>
                 </div>
 
-                {/* Row 4: Major(s) + Minor(s) */}
                 <div className="flex gap-[35px]">
                   <div className="flex-1 flex flex-col gap-1.5">
                     <FieldLabel htmlFor="majors" required>Major(s)</FieldLabel>
@@ -447,86 +438,70 @@ export default function ApplicationForm() {
                     <TextInput id="minors" placeholder="e.g. Mathematics" value={minors} onChange={setMinors} />
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
 
-          {activeTab === "short-answer" && (
-            <div className="bg-white border border-[#e4e4e7] rounded-md p-8 flex flex-col gap-8">
-              {/* Career goals */}
-              <div className="flex flex-col gap-1.5">
-                <FieldLabel htmlFor="careerGoals" required>
-                  Please provide a brief overview of your career goals — it is completely okay if you are still exploring!
-                </FieldLabel>
-                <TextArea id="careerGoals" placeholder="Start typing ..." value={careerGoals} onChange={setCareerGoals} rows={3} />
-              </div>
-
-              {/* LinkedIn */}
-              <div className="flex flex-col gap-1.5">
-                <FieldLabel htmlFor="linkedinUrl" required>LinkedIn URL</FieldLabel>
-                <TextInput id="linkedinUrl" placeholder="Start typing ..." value={linkedinUrl} onChange={setLinkedinUrl} />
-              </div>
-
-              {/* Commitments */}
-              <div className="flex flex-col gap-1.5">
-                <FieldLabel htmlFor="commitments" required>
-                  ICG is a long-term, high-effort commitment. List all current/potential weekly commitments (classes, work, internships, clubs, applications). Disclose, with accuracy, the total hours you can realistically dedicate to ICG, as members are held accountable. Intentional omission may lead to removal.
-                </FieldLabel>
-                <TextArea id="commitments" placeholder="Start typing ..." value={commitments} onChange={setCommitments} rows={3} />
-              </div>
-
-              {/* Info session */}
-              <div className="flex flex-col gap-1.5">
-                <FieldLabel htmlFor="infoSession">Did you attend the information session</FieldLabel>
-                <div className="relative">
-                  <select
-                    id="infoSession"
-                    value={infoSession}
-                    onChange={(e) => setInfoSession(e.target.value)}
-                    className="h-12 w-full border border-[#e4e4e7] rounded px-4 pr-10 text-base text-[#52525b] bg-white outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 transition appearance-none"
-                  >
-                    <option value="" disabled>Select</option>
-                    <option value="yes">Yes</option>
-                    <option value="no">No</option>
-                  </select>
-                  <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 text-[#52525b] pointer-events-none" />
+                <div className="flex flex-col gap-1.5">
+                  <FieldLabel htmlFor="linkedinUrl" required>LinkedIn URL</FieldLabel>
+                  <TextInput id="linkedinUrl" placeholder="Start typing ..." value={linkedinUrl} onChange={setLinkedinUrl} />
                 </div>
-              </div>
 
-              {/* Resume upload */}
-              <div
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragOver(false);
-                  handleFileInput(e.dataTransfer.files[0]);
-                }}
-                onClick={() => fileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-md h-[158px] flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors ${
-                  dragOver ? "border-[#061c2a] bg-[#f4f4f5]" : "border-[#e4e4e7] hover:border-[#a1a1aa]"
-                }`}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,image/*"
-                  className="hidden"
-                  onChange={(e) => handleFileInput(e.target.files?.[0])}
-                />
-                <UploadIcon className="text-[#52525b]" />
-                {resumeFile ? (
-                  <p className="text-sm font-medium text-[#061c2a]">{resumeFile.name}</p>
-                ) : existingResumeName ? (
-                  <p className="text-sm font-medium text-[#061c2a]">{existingResumeName}</p>
-                ) : (
-                  <>
-                    <p className="text-sm text-black">
-                      Drag and drop a <strong>PDF of your resume</strong>
-                    </p>
-                    <p className="text-sm text-black">.png, .jpg up to 5MB</p>
-                  </>
-                )}
+                <div className="flex flex-col gap-1.5">
+                  <FieldLabel htmlFor="commitments" required>
+                    ICG is a long-term, high-effort commitment. List all current/potential weekly commitments (classes, work, internships, clubs, applications). Disclose, with accuracy, the total hours you can realistically dedicate to ICG, as members are held accountable.
+                  </FieldLabel>
+                  <TextArea id="commitments" placeholder="Start typing ..." value={commitments} onChange={setCommitments} rows={3} />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <FieldLabel htmlFor="infoSession">Did you attend the information session</FieldLabel>
+                  <div className="relative">
+                    <select
+                      id="infoSession"
+                      value={infoSession}
+                      onChange={(e) => setInfoSession(e.target.value)}
+                      className="h-12 w-full border border-[#e4e4e7] rounded px-4 pr-10 text-base text-[#52525b] bg-white outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 transition appearance-none"
+                    >
+                      <option value="" disabled>Select</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
+                    <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 text-[#52525b] pointer-events-none" />
+                  </div>
+                </div>
+
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    handleFileInput(e.dataTransfer.files[0]);
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-md h-[158px] flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors ${
+                    dragOver ? "border-[#061c2a] bg-[#f4f4f5]" : "border-[#e4e4e7] hover:border-[#a1a1aa]"
+                  }`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,image/*"
+                    className="hidden"
+                    onChange={(e) => handleFileInput(e.target.files?.[0])}
+                  />
+                  <UploadIcon className="text-[#52525b]" />
+                  {resumeFile ? (
+                    <p className="text-sm font-medium text-[#061c2a]">{resumeFile.name}</p>
+                  ) : existingResumeName ? (
+                    <p className="text-sm font-medium text-[#061c2a]">{existingResumeName}</p>
+                  ) : (
+                    <>
+                      <p className="text-sm text-black">
+                        Drag and drop a <strong>PDF of your resume</strong>
+                      </p>
+                      <p className="text-sm text-black">.png, .jpg up to 5MB</p>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           )}

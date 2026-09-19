@@ -39,6 +39,7 @@ export type ApplicantRow = {
   cc_notes: string;
   /** Individual Round 2 (Round 1 reuses the gi_* fields above). */
   r2_status: string;
+  r2_session_id: string | null;
   r2_score: number | null;
   r2_notes: string;
   /** BBQ social — 'accepted' means they appear in the BBQ Social tab. */

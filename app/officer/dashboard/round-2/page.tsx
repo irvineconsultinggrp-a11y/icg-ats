@@ -8,6 +8,7 @@ export default function Round2Page() {
       subtitle="Second 1-on-1 interview round. Accept applicants to the BBQ Social."
       advanceLabel="Accept to BBQ Social"
       advancePatch={{ r2_status: "completed", social_status: "accepted" }}
+      pipelineStep="round-2"
     />
   );
 }

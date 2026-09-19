@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { requireOfficer } from "@/lib/auth/session";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { sanitizeNoteHtml, noteTextLength } from "@/lib/applicants/sanitize-html";
+import { parseNoteSignal } from "@/lib/applicants/note-signal";
 import type { ApplicantNoteRow } from "@/lib/applicants/notes";
 
 const NOTE_COLUMNS =
-  "id, applicant_id, author_user_id, author_name, title, body_html, created_at, updated_at";
+  "id, applicant_id, author_user_id, author_name, title, body_html, signal, created_at, updated_at";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -60,15 +61,22 @@ export async function POST(request: Request, context: RouteContext) {
   const gate = await requireOfficer();
   if ("response" in gate) return gate.response;
 
-  let body: { title?: string; bodyHtml?: string };
+  let body: { title?: string; bodyHtml?: string; signal?: string | null };
   try {
-    body = (await request.json()) as { title?: string; bodyHtml?: string };
+    body = (await request.json()) as { title?: string; bodyHtml?: string; signal?: string | null };
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   const title = (body.title ?? "").trim().slice(0, 200);
   const bodyHtml = sanitizeNoteHtml(body.bodyHtml ?? "");
+  const signal =
+    body.signal === null || body.signal === undefined
+      ? null
+      : parseNoteSignal(body.signal);
+  if (body.signal !== undefined && body.signal !== null && signal === null) {
+    return NextResponse.json({ error: "Invalid signal." }, { status: 400 });
+  }
 
   if (!title && noteTextLength(bodyHtml) === 0) {
     return NextResponse.json({ error: "Note is empty." }, { status: 400 });
@@ -101,6 +109,7 @@ export async function POST(request: Request, context: RouteContext) {
       author_name: authorName,
       title,
       body_html: bodyHtml,
+      signal,
     })
     .select(NOTE_COLUMNS)
     .maybeSingle();

@@ -7,7 +7,8 @@ export default function Round1Page() {
       title="Individual Round 1"
       subtitle="First 1-on-1 interview round. Score each applicant and advance them to Round 2."
       advanceLabel="Advance to Round 2"
-      advancePatch={{ gi_status: "completed" }}
+      advancePatch={{ gi_status: "completed", r2_status: "pending" }}
+      pipelineStep="round-1"
     />
   );
 }

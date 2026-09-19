@@ -1,3 +1,5 @@
+import type { NoteSignal, NoteSignalCounts } from "@/lib/applicants/note-signal";
+
 /** Client + shared types for the per-applicant coffee-chat notes folder. */
 
 export type ApplicantNoteRow = {
@@ -7,6 +9,7 @@ export type ApplicantNoteRow = {
   author_name: string;
   title: string;
   body_html: string;
+  signal: NoteSignal | null;
   created_at: string;
   updated_at: string;
 };
@@ -27,9 +30,22 @@ export async function fetchApplicantNotes(
   return { data: body.data ?? [] };
 }
 
+export async function fetchApplicantNoteSignals(): Promise<{
+  data?: Record<string, NoteSignalCounts>;
+  error?: string;
+}> {
+  const res = await fetch("/api/applicants/note-signals", { credentials: "include" });
+  const body = (await res.json()) as {
+    data?: Record<string, NoteSignalCounts>;
+    error?: string;
+  };
+  if (!res.ok) return { error: body.error ?? "Failed to load note ratings." };
+  return { data: body.data ?? {} };
+}
+
 export async function createApplicantNote(
   applicantId: string,
-  input: { title: string; bodyHtml: string },
+  input: { title: string; bodyHtml: string; signal?: NoteSignal | null },
 ): Promise<{ data?: ApplicantNote; error?: string }> {
   const res = await fetch(`/api/applicants/${applicantId}/notes`, {
     method: "POST",
@@ -45,7 +61,7 @@ export async function createApplicantNote(
 export async function updateApplicantNote(
   applicantId: string,
   noteId: string,
-  input: { title?: string; bodyHtml?: string },
+  input: { title?: string; bodyHtml?: string; signal?: NoteSignal | null },
 ): Promise<{ data?: ApplicantNote; error?: string }> {
   const res = await fetch(`/api/applicants/${applicantId}/notes/${noteId}`, {
     method: "PATCH",
