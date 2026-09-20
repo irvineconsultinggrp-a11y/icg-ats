@@ -68,6 +68,8 @@ npm run lint    # eslint
 
 ## 5. Deploy (Vercel)
 
+Production: **`apply.irvineconsultinggroup.com`** — GitHub **`irvineconsultinggrp-a11y/icg-ats`**, branch **`main`**.
+
 1. Import the repo into Vercel.
 2. Add every variable from section 1 in Project → Settings → Environment Variables
    (keep `SUPABASE_SERVICE_ROLE_KEY` and `OFFICER_SIGNUP_CODE` server-side only).
