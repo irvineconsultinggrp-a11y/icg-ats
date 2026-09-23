@@ -4,10 +4,8 @@ import { createAdminClient } from "@/utils/supabase/admin";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * Officer self-signup, gated by a shared invite code (OFFICER_SIGNUP_CODE).
- * The code is the trust boundary, so the account is created server-side with the
- * officer role already set and email auto-confirmed. Fails closed when no code is
- * configured, so officer accounts can never be self-provisioned by accident.
+ * Officer self-signup, gated by OFFICER_SIGNUP_CODE. Account is created confirmed
+ * so they can sign in immediately (no confirmation email).
  */
 export async function POST(request: Request) {
   const configuredCode = process.env.OFFICER_SIGNUP_CODE?.trim();
@@ -60,13 +58,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Server configuration error." }, { status: 500 });
   }
 
-  // Create the account with the officer role set server-side (secure), but leave it
-  // unconfirmed — the officer must click a confirmation email so a mistyped address is
-  // caught before the account can be used. The signup page triggers the email via resend.
   const { error } = await admin.auth.admin.createUser({
     email,
     password,
-    email_confirm: false,
+    email_confirm: true,
     user_metadata: { full_name: fullName, first_name: firstName, last_name: lastName },
     app_metadata: { role: "officer" },
   });

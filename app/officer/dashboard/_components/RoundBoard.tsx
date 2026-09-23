@@ -17,7 +17,9 @@ import {
 } from "@/lib/applicants/stages";
 import type { ApplicantStats, RoundStatusCounts } from "@/app/api/applicants/stats/route";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
+import { StatusChangeWithEmailDialog } from "@/components/email/StatusChangeWithEmailDialog";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import type { TransactionalEmailId } from "@/lib/email/transactional-templates";
 
 type Applicant = ReturnType<typeof rowToRound>;
 
@@ -138,6 +140,10 @@ export function RoundBoard({
   const [total, setTotal] = useState(0);
   const [confirmAdvance, setConfirmAdvance] = useState(false);
   const [advancing, setAdvancing] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+
+  const roundRejectTemplate: TransactionalEmailId =
+    round === 1 ? "round-1-reject" : "round-2-reject";
 
   const selected = applicants.find((a) => a.id === selectedId) ?? null;
   const selectedAdvancedToNext =
@@ -528,7 +534,7 @@ export function RoundBoard({
                 )}
                 <button
                   type="button"
-                  onClick={() => void update(selected.id, roundToPatch(round, { status: "rejected" }))}
+                  onClick={() => setRejectDialogOpen(true)}
                   disabled={selected.status === "rejected"}
                   className="h-11 w-full border border-red-200 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 hover:border-red-300 active:scale-[0.98] transition-all disabled:opacity-40"
                 >
@@ -539,6 +545,20 @@ export function RoundBoard({
           )}
         </div>
       </div>
+
+      {selected && (
+        <StatusChangeWithEmailDialog
+          open={rejectDialogOpen}
+          onClose={() => setRejectDialogOpen(false)}
+          applicantId={selected.id}
+          templateId={roundRejectTemplate}
+          actionLabel={round === 1 ? "Reject after Round 1" : "Reject after Round 2"}
+          onConfirmStatus={async () => {
+            const ok = await update(selected.id, roundToPatch(round, { status: "rejected" }));
+            if (!ok) throw new Error("Could not update status.");
+          }}
+        />
+      )}
     </main>
   );
 }

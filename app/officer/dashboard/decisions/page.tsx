@@ -9,10 +9,10 @@ import {
 } from "@/lib/applicants/stages";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
-import {
-  LazyEmailTemplatesModal,
-  type EmailTemplate,
-} from "../_components/LazyEmailTemplatesModal";
+import { SendTransactionalEmailModal } from "@/components/email/SendTransactionalEmailModal";
+import { StatusChangeWithEmailDialog } from "@/components/email/StatusChangeWithEmailDialog";
+import { DECISION_EMAIL_UI } from "@/lib/email/transactional-templates";
+import { LazyEmailTemplatesModal } from "../_components/LazyEmailTemplatesModal";
 
 // --- Icons ---
 
@@ -103,80 +103,21 @@ function ScoreStars({ value }: { value: number | null }) {
   );
 }
 
-// --- Email templates ---
-
-const DECISION_EMAIL_TEMPLATES: EmailTemplate[] = [
-  {
-    id: "decision-accept",
-    name: "Acceptance Offer",
-    description: "Extend membership offer",
-    subject: "Welcome to ICG! – Offer of Membership",
-    html: `<p>Dear <strong>[First Name]</strong>,</p>
-<p>On behalf of the entire <strong>Irvine Consulting Group (ICG)</strong> team, we are absolutely thrilled to offer you a position as a <strong>Junior Associate</strong> for the <strong>Fall 2026</strong> term!</p>
-<p>Your performance throughout the recruitment process — your application, individual interviews, and social — truly stood out, and we are confident you will be a tremendous asset to our team.</p>
-<p><strong>Next Steps</strong></p>
-<ul>
-<li>Please confirm your acceptance by replying to this email by <strong>[Acceptance Deadline]</strong></li>
-<li>Attend our <strong>New Member Orientation</strong> on <strong>[Orientation Date &amp; Time]</strong></li>
-<li>Watch for a Slack workspace invitation to join our member channels</li>
-</ul>
-<p>We cannot wait to have you on the team. <strong>Welcome to ICG!</strong></p>
-<p>With excitement,<br><strong>The ICG Recruitment Team</strong><br>Irvine Consulting Group | University of California, Irvine</p>`,
-    text: `Dear [First Name],
-
-On behalf of the entire Irvine Consulting Group (ICG) team, we are absolutely thrilled to offer you a position as a Junior Associate for the Fall 2026 term!
-
-Your performance throughout the recruitment process — your application, individual interviews, and social — truly stood out, and we are confident you will be a tremendous asset to our team.
-
-Next Steps
-- Please confirm your acceptance by replying to this email by [Acceptance Deadline]
-- Attend our New Member Orientation on [Orientation Date & Time]
-- Watch for a Slack workspace invitation to join our member channels
-
-We cannot wait to have you on the team. Welcome to ICG!
-
-With excitement,
-The ICG Recruitment Team
-Irvine Consulting Group | University of California, Irvine`,
-  },
-  {
-    id: "decision-reject",
-    name: "Rejection Notice",
-    description: "Respectful rejection email",
-    subject: "ICG Recruitment Update",
-    html: `<p>Dear <strong>[First Name]</strong>,</p>
-<p>Thank you sincerely for your time and dedication throughout the <strong>Irvine Consulting Group (ICG)</strong> recruitment process.</p>
-<p>After thoughtful deliberation, we regret to inform you that we are unable to extend an offer at this time. This was an exceptionally competitive cycle, and this decision is in absolutely no way a reflection of your abilities or potential.</p>
-<p>We deeply appreciate the effort you invested at every stage of the process, and we genuinely encourage you to apply again in a future recruitment cycle — we would love to see you back.</p>
-<p>We wish you all the best in your academic and professional pursuits, and hope to stay connected.</p>
-<p>Warm regards,<br><strong>The ICG Recruitment Team</strong><br>Irvine Consulting Group | University of California, Irvine</p>`,
-    text: `Dear [First Name],
-
-Thank you sincerely for your time and dedication throughout the Irvine Consulting Group (ICG) recruitment process.
-
-After thoughtful deliberation, we regret to inform you that we are unable to extend an offer at this time. This was an exceptionally competitive cycle, and this decision is in absolutely no way a reflection of your abilities or potential.
-
-We deeply appreciate the effort you invested at every stage of the process, and we genuinely encourage you to apply again in a future recruitment cycle — we would love to see you back.
-
-We wish you all the best in your academic and professional pursuits, and hope to stay connected.
-
-Warm regards,
-The ICG Recruitment Team
-Irvine Consulting Group | University of California, Irvine`,
-  },
-];
-
 // --- Detail panel ---
 
 function DetailPanel({
   decision,
   onClose,
   onUpdate,
+  onAcceptClick,
+  onRejectClick,
   saveError,
 }: {
   decision: Decision;
   onClose: () => void;
   onUpdate: (patch: Partial<Decision>) => void;
+  onAcceptClick: () => void;
+  onRejectClick: () => void;
   saveError?: string;
 }) {
   const [notes, setNotes] = useState(decision.notes);
@@ -263,7 +204,7 @@ function DetailPanel({
           <p className="text-xs text-[#6b7280] font-medium">Current: <span className={`font-semibold ${STATUS_CONFIG[decision.status].text}`}>{STATUS_CONFIG[decision.status].label}</span></p>
           <button
             type="button"
-            onClick={() => onUpdate({ status: "accepted" })}
+            onClick={onAcceptClick}
             disabled={decision.status === "accepted"}
             className="flex items-center justify-center h-11 w-full bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
@@ -271,7 +212,7 @@ function DetailPanel({
           </button>
           <button
             type="button"
-            onClick={() => onUpdate({ status: "rejected" })}
+            onClick={onRejectClick}
             disabled={decision.status === "rejected"}
             className="flex items-center justify-center h-11 w-full border border-red-200 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
@@ -314,6 +255,8 @@ export default function DecisionsPage() {
   const [activeTab, setActiveTab] = useState<StatusTab>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
@@ -350,28 +293,28 @@ export default function DecisionsPage() {
     void loadDecisions();
   }, [loadDecisions]);
 
-  async function updateDecision(id: string, patch: Partial<Decision>) {
+  async function updateDecision(id: string, patch: Partial<Decision>): Promise<boolean> {
     const previous = decisions;
     setDecisions((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
 
     const apiPatch = decisionToPatch(patch);
-    if (Object.keys(apiPatch).length === 0) return;
+    if (Object.keys(apiPatch).length === 0) return true;
 
     setSaveError("");
     const result = await patchApplicant(id, apiPatch);
     if (result.error || !result.data) {
       setDecisions(previous);
       setSaveError(result.error ?? "Failed to save.");
-      return;
+      return false;
     }
     setDecisions((prev) =>
       prev.map((d) => (d.id === id ? rowToDecision(result.data!) : d)),
     );
-    // A status change moves the applicant between tabs — reload the filtered view.
     if (patch.status !== undefined && activeTab !== "all") {
       setSelectedId(null);
       void loadDecisions();
     }
+    return true;
   }
 
   const counts: Record<StatusTab, number> = useMemo(
@@ -598,16 +541,45 @@ export default function DecisionsPage() {
           <DetailPanel
             decision={selected}
             onClose={() => setSelectedId(null)}
-            onUpdate={(patch) => updateDecision(selected.id, patch)}
+            onUpdate={(patch) => void updateDecision(selected.id, patch)}
+            onAcceptClick={() => setAcceptDialogOpen(true)}
+            onRejectClick={() => setRejectDialogOpen(true)}
             saveError={saveError}
           />
         )}
       </div>
 
+      {selected && (
+        <>
+          <StatusChangeWithEmailDialog
+            open={acceptDialogOpen}
+            onClose={() => setAcceptDialogOpen(false)}
+            applicantId={selected.id}
+            templateId="decision-accept"
+            actionLabel="Accept and send offer"
+            onConfirmStatus={async () => {
+              const ok = await updateDecision(selected.id, { status: "accepted" });
+              if (!ok) throw new Error("Could not update status.");
+            }}
+          />
+          <StatusChangeWithEmailDialog
+            open={rejectDialogOpen}
+            onClose={() => setRejectDialogOpen(false)}
+            applicantId={selected.id}
+            templateId="decision-reject"
+            actionLabel="Reject applicant"
+            onConfirmStatus={async () => {
+              const ok = await updateDecision(selected.id, { status: "rejected" });
+              if (!ok) throw new Error("Could not update status.");
+            }}
+          />
+        </>
+      )}
+
       <LazyEmailTemplatesModal
         isOpen={templatesOpen}
         onClose={() => setTemplatesOpen(false)}
-        templates={DECISION_EMAIL_TEMPLATES}
+        templates={DECISION_EMAIL_UI}
         title="Decision Email Templates"
       />
     </main>

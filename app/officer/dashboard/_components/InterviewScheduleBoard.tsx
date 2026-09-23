@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchPipelineApplicants,
   interviewScheduleToPatch,
@@ -11,7 +11,9 @@ import {
   buildAssignmentId,
   buildSlotId,
   getGroupInterviewSlot,
+  GROUP_INTERVIEW_SLOTS,
   INTERVIEW_ROOMS,
+  interviewRoomDisplayName,
   isAssignedOnScheduleDay,
   LUNCH_BREAK_LABEL,
   parseAssignmentId,
@@ -26,6 +28,14 @@ import {
   saveRoomHosts,
 } from "@/lib/interview-schedule/room-hosts";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
+import { BatchEmailCampaignModal } from "@/components/email/BatchEmailCampaignModal";
+import {
+  fetchScheduleEmailSendsClient,
+  formatSendLabel,
+  sendForCurrentAssignment,
+  type ScheduleEmailSendRecord,
+} from "@/lib/email/schedule-email-sends";
+import { campaignFromRound, type EmailCampaignScope } from "@/lib/email/types";
 
 type Applicant = ReturnType<typeof rowToInterviewSchedule>;
 
@@ -40,29 +50,154 @@ function isApplicantDragEvent(e: React.DragEvent): boolean {
   return types.includes(APPLICANT_DRAG_TYPE) || types.includes("text/plain");
 }
 
+function availabilityForScheduleDay(applicant: Applicant, scheduleDay: string) {
+  const slotOrder = GROUP_INTERVIEW_SLOTS.filter((s) => s.date === scheduleDay).map((s) => s.id);
+  const orderIndex = new Map(slotOrder.map((id, index) => [id, index]));
+  const entries: { id: string; label: string }[] = [];
+  for (const id of applicant.availableSlots) {
+    const slot = getGroupInterviewSlot(id);
+    if (slot?.date !== scheduleDay) continue;
+    entries.push({ id, label: slot.time });
+  }
+  entries.sort(
+    (a, b) => (orderIndex.get(a.id) ?? 999) - (orderIndex.get(b.id) ?? 999),
+  );
+  return entries;
+}
+
+function ApplicantAvailabilityModal({
+  applicant,
+  scheduleDay,
+  activeSlotId,
+  onClose,
+  onSelectSlot,
+}: {
+  applicant: Applicant;
+  scheduleDay: string;
+  activeSlotId: string | null;
+  onClose: () => void;
+  onSelectSlot: (slotId: string) => void;
+}) {
+  const label = `${applicant.firstName} ${applicant.lastName}`.trim();
+  const times = availabilityForScheduleDay(applicant, scheduleDay);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="availability-modal-title"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-xl border border-[#e4e4e7] bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="border-b border-[#e4e4e7] px-6 py-4">
+          <h2 id="availability-modal-title" className="text-lg font-semibold text-[#061c2a]">
+            {label}
+          </h2>
+          <p className="text-sm text-[#6b7280] mt-0.5">{applicant.email}</p>
+          <p className="text-xs text-[#6b7280] mt-2">{scheduleDay}</p>
+        </div>
+        <div className="px-6 py-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#6b7280] mb-3">
+            Available interview blocks
+          </p>
+          {times.length === 0 ? (
+            <p className="text-sm text-[#6b7280]">No availability submitted for this day.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {times.map(({ id, label: timeLabel }) => {
+                const selected = activeSlotId === id;
+                return (
+                  <li key={id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSelectSlot(id);
+                        onClose();
+                      }}
+                      className={`w-full rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
+                        selected
+                          ? "border-[#061c2a] bg-[#061c2a]/5 font-semibold text-[#061c2a]"
+                          : "border-[#e4e4e7] text-[#111827] hover:border-[#061c2a]/30 hover:bg-[#fafafa]"
+                      }`}
+                    >
+                      {timeLabel}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <p className="text-xs text-[#a1a1aa] mt-4">
+            Close this window, then drag their bubble into a room for the time block you want.
+          </p>
+        </div>
+        <div className="flex justify-end border-t border-[#e4e4e7] px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-10 px-4 rounded-lg border border-[#e4e4e7] text-sm font-medium text-[#374151] hover:bg-[#f4f4f5]"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function UnscheduledBubble({
   applicant,
+  scheduleDay,
+  onOpenAvailability,
   dragging,
   onDragStart,
   onDragEnd,
 }: {
   applicant: Applicant;
+  scheduleDay: string;
+  onOpenAvailability: () => void;
   dragging: boolean;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
 }) {
+  const didDragRef = useRef(false);
   const label = `${applicant.firstName} ${applicant.lastName}`.trim();
+  const count = availabilityForScheduleDay(applicant, scheduleDay).length;
   const slotHint =
-    applicant.availableSlots.length === 0
-      ? "No availability on application"
-      : `${applicant.availableSlots.length} block${applicant.availableSlots.length === 1 ? "" : "s"}`;
+    count === 0
+      ? "No availability this day"
+      : `${count} block${count === 1 ? "" : "s"}`;
 
   return (
     <div
       draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      title={`${label} · ${applicant.email} · ${slotHint}. Drag into a room.`}
+      onDragStart={(e) => {
+        didDragRef.current = true;
+        onDragStart(e);
+      }}
+      onDragEnd={() => {
+        onDragEnd();
+        window.setTimeout(() => {
+          didDragRef.current = false;
+        }, 0);
+      }}
+      onClick={() => {
+        if (didDragRef.current) return;
+        onOpenAvailability();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpenAvailability();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      title={`${label} · ${applicant.email}. Click name for times; drag into a room.`}
       className={`inline-flex max-w-[220px] cursor-grab active:cursor-grabbing items-center gap-2 rounded-full border bg-white px-3 py-2 shadow-sm transition-all select-none ${
         dragging
           ? "border-[#061c2a] opacity-50 ring-2 ring-[#061c2a]/20"
@@ -81,6 +216,17 @@ function UnscheduledBubble({
         <span className="truncate text-[10px] text-[#6b7280]">{slotHint}</span>
       </span>
     </div>
+  );
+}
+
+function ScheduleEmailSentBadge({ title }: { title?: string }) {
+  return (
+    <span
+      title={title}
+      className="inline-flex flex-shrink-0 items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-800 cursor-help"
+    >
+      Sent
+    </span>
   );
 }
 
@@ -163,17 +309,36 @@ export function InterviewScheduleBoard({ config }: { config: InterviewScheduleRo
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null);
   const [draggingApplicantId, setDraggingApplicantId] = useState<string | null>(null);
   const [dropTargetRoom, setDropTargetRoom] = useState<InterviewRoom | null>(null);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [emailModalScope, setEmailModalScope] = useState<EmailCampaignScope>("time-block");
+  const [emailModalRoom, setEmailModalRoom] = useState<InterviewRoom | null>(null);
+  const [scheduleEmailSends, setScheduleEmailSends] = useState<ScheduleEmailSendRecord[]>([]);
+  const [availabilityModalApplicant, setAvailabilityModalApplicant] = useState<Applicant | null>(
+    null,
+  );
+
+  const slotOptions = useMemo(
+    () =>
+      daySlots.map((time) => ({
+        id: buildSlotId(scheduleDay, time),
+        label: time,
+      })),
+    [daySlots, scheduleDay],
+  );
+
+  const emailCampaign = campaignFromRound(round);
 
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError("");
-    const [result, hosts] = await Promise.all([
+    const [result, hosts, sendLog] = await Promise.all([
       fetchPipelineApplicants(pipeline, {
         search: debouncedSearch,
         limit: 500,
         offset: 0,
       }),
       fetchRoomHosts(),
+      fetchScheduleEmailSendsClient(emailCampaign),
     ]);
     if (result.error) {
       setLoadError(result.error);
@@ -182,8 +347,9 @@ export function InterviewScheduleBoard({ config }: { config: InterviewScheduleRo
       setApplicants((result.data ?? []).map((row) => rowToInterviewSchedule(row, round)));
     }
     if (hosts.data) setRoomHosts(hosts.data);
+    if (!sendLog.error) setScheduleEmailSends(sendLog.records);
     setLoading(false);
-  }, [debouncedSearch, pipeline, round]);
+  }, [debouncedSearch, emailCampaign, pipeline, round]);
 
   useEffect(() => {
     void load();
@@ -329,15 +495,9 @@ export function InterviewScheduleBoard({ config }: { config: InterviewScheduleRo
 
   return (
     <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-      <div className="px-8 pt-8 pb-4 flex flex-col gap-2 border-b border-[#e4e4e7]">
+      <div className="px-8 pt-8 pb-4 border-b border-[#e4e4e7]">
         <h1 className="text-2xl font-bold text-[#061c2a]">{title}</h1>
-        <p className="text-sm text-[#6b7280]">{subtitle}</p>
-        <p className="text-xs text-[#6b7280] max-w-3xl">
-          {INTERVIEW_ROOMS.length} rooms · up to {applicantsPerRoom} interviewees per room ·{" "}
-          {hostingOfficersPerRoom} hosting officer slots · {LUNCH_BREAK_LABEL}. Enter officers in each room,
-          then drag applicants from{" "}
-          <span className="font-medium text-[#374151]">Not scheduled yet</span> into a room.
-        </p>
+        <p className="text-sm text-[#6b7280] mt-1">{subtitle}</p>
       </div>
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -404,6 +564,18 @@ export function InterviewScheduleBoard({ config }: { config: InterviewScheduleRo
                 {autoSorting ? "Sorting…" : "Sort into rooms"}
               </button>
             )}
+            <button
+              type="button"
+              disabled={loading || !!loadError}
+              onClick={() => {
+                setEmailModalScope(activeSlotId ? "time-block" : "all-assigned");
+                setEmailModalRoom(null);
+                setEmailModalOpen(true);
+              }}
+              className="h-9 flex-shrink-0 rounded-lg border border-[#061c2a] px-4 text-sm font-medium text-[#061c2a] hover:bg-[#061c2a]/5 disabled:opacity-50"
+            >
+              Send email
+            </button>
             {draggingApplicantId && activeSlotId && (
               <span className="text-xs text-[#061c2a] font-medium bg-[#061c2a]/10 px-3 py-1.5 rounded-full">
                 Drop into a room (max {applicantsPerRoom} per room)
@@ -429,7 +601,7 @@ export function InterviewScheduleBoard({ config }: { config: InterviewScheduleRo
                 <span className="ml-2 text-sm font-normal text-[#6b7280]">({unscheduled.length})</span>
               </h2>
               <p className="text-xs text-[#6b7280] mb-3">
-                Drag a bubble into a room for the selected time block.
+                Click a bubble for available times. Drag into a room to schedule.
               </p>
               {unscheduled.length === 0 ? (
                 <p className="text-sm text-[#a1a1aa] italic">Everyone here has a room assignment.</p>
@@ -439,6 +611,8 @@ export function InterviewScheduleBoard({ config }: { config: InterviewScheduleRo
                     <UnscheduledBubble
                       key={a.id}
                       applicant={a}
+                      scheduleDay={scheduleDay}
+                      onOpenAvailability={() => setAvailabilityModalApplicant(a)}
                       dragging={draggingApplicantId === a.id}
                       onDragStart={(e) => {
                         e.dataTransfer.setData(APPLICANT_DRAG_TYPE, a.id);
@@ -446,6 +620,7 @@ export function InterviewScheduleBoard({ config }: { config: InterviewScheduleRo
                         e.dataTransfer.effectAllowed = "move";
                         setDraggingApplicantId(a.id);
                         setSaveError("");
+                        setAvailabilityModalApplicant(null);
                       }}
                       onDragEnd={() => {
                         setDraggingApplicantId(null);
@@ -467,10 +642,23 @@ export function InterviewScheduleBoard({ config }: { config: InterviewScheduleRo
               <>
                 {activeSlot && activeSlotId ? (
                   <section>
-                    <h2 className="text-base font-semibold text-[#111827] mb-1">
-                      {activeSlot.date} · {activeSlot.time}
-                    </h2>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+                      <h2 className="text-base font-semibold text-[#111827]">
+                        {activeSlot.date} · {activeSlot.time}
+                      </h2>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEmailModalScope("time-block");
+                          setEmailModalRoom(null);
+                          setEmailModalOpen(true);
+                        }}
+                        className="text-xs font-medium text-[#061c2a] underline hover:text-[#0d2f47]"
+                      >
+                        Email everyone in this time block
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                       {INTERVIEW_ROOMS.map((room) => {
                         const assignmentId = buildAssignmentId(
                           activeSlot.date,
@@ -511,10 +699,27 @@ export function InterviewScheduleBoard({ config }: { config: InterviewScheduleRo
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-semibold text-[#374151]">{room}</p>
-                              <span className="text-[11px] text-[#6b7280] tabular-nums">
-                                {occupants.length}/{applicantsPerRoom}
-                              </span>
+                              <p className="text-sm font-semibold text-[#374151]">
+                                {interviewRoomDisplayName(room)}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                {occupants.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEmailModalScope("room");
+                                      setEmailModalRoom(room);
+                                      setEmailModalOpen(true);
+                                    }}
+                                    className="text-[10px] font-medium text-[#061c2a] hover:underline"
+                                  >
+                                    Email room
+                                  </button>
+                                )}
+                                <span className="text-[11px] text-[#6b7280] tabular-nums">
+                                  {occupants.length}/{applicantsPerRoom}
+                                </span>
+                              </div>
                             </div>
                             <div className="flex flex-col gap-1">
                               <label className="text-[11px] font-medium text-[#6b7280] uppercase tracking-wide">
@@ -543,10 +748,22 @@ export function InterviewScheduleBoard({ config }: { config: InterviewScheduleRo
                                   key={o.id}
                                   className="flex items-start justify-between gap-2 rounded-lg bg-[#f9fafb] px-2.5 py-2"
                                 >
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-medium text-[#111827] truncate">
-                                      {o.firstName} {o.lastName}
-                                    </p>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <p className="text-sm font-medium text-[#111827] truncate">
+                                        {o.firstName} {o.lastName}
+                                      </p>
+                                      {(() => {
+                                        const sent = sendForCurrentAssignment(
+                                          o.id,
+                                          o.assignedSlot,
+                                          scheduleEmailSends,
+                                        );
+                                        return sent ? (
+                                          <ScheduleEmailSentBadge title={formatSendLabel(sent)} />
+                                        ) : null;
+                                      })()}
+                                    </div>
                                     <p className="text-[11px] text-[#6b7280] truncate">{o.email}</p>
                                   </div>
                                   <button
@@ -579,6 +796,29 @@ export function InterviewScheduleBoard({ config }: { config: InterviewScheduleRo
           </div>
         </div>
       </div>
+
+      {availabilityModalApplicant ? (
+        <ApplicantAvailabilityModal
+          applicant={availabilityModalApplicant}
+          scheduleDay={scheduleDay}
+          activeSlotId={activeSlotId}
+          onClose={() => setAvailabilityModalApplicant(null)}
+          onSelectSlot={(slotId) => setActiveSlotId(slotId)}
+        />
+      ) : null}
+
+      <BatchEmailCampaignModal
+        open={emailModalOpen}
+        onClose={() => setEmailModalOpen(false)}
+        campaign={campaignFromRound(round)}
+        scheduleDay={scheduleDay}
+        defaultSlotId={activeSlotId}
+        defaultRoom={emailModalRoom}
+        slotOptions={slotOptions}
+        initialScope={emailModalScope}
+        emailSends={scheduleEmailSends}
+        onSent={() => void load()}
+      />
     </main>
   );
 }

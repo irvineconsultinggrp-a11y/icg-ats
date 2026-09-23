@@ -3,8 +3,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { createClient } from "@/utils/supabase/client";
-
 export default function OfficerSignup() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -15,8 +13,6 @@ export default function OfficerSignup() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -38,84 +34,16 @@ export default function OfficerSignup() {
         body: JSON.stringify({ firstName, lastName, email, password, code }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
+      setLoading(false);
       if (!res.ok || !data.ok) {
-        setLoading(false);
         setError(data.error ?? "Could not create your account.");
         return;
       }
-
-      // Account created with the officer role but unconfirmed — send the confirmation
-      // email so they verify the address before they can sign in.
-      const supabase = createClient();
-      const { error: resendError } = await supabase.auth.resend({
-        type: "signup",
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?intent=officer&next=/officer/dashboard`,
-        },
-      });
-      setLoading(false);
-      if (resendError) {
-        setError(
-          "Your account was created, but we couldn't send the confirmation email. Try signing in, or contact an admin.",
-        );
-        return;
-      }
-      setEmailSent(true);
+      window.location.href = "/officer/login?created=1";
     } catch {
       setLoading(false);
       setError("Network error. Please try again.");
     }
-  }
-
-  if (emailSent) {
-    return (
-      <div className="min-h-screen flex font-sans">
-        <div className="relative w-[36%] min-w-[280px] bg-[#061c2a] overflow-hidden flex-shrink-0">
-          <Image src="/images/cityscape.png" alt="" fill className="object-cover opacity-20" priority />
-          <div className="relative z-10 flex flex-col gap-3 px-12 pt-20">
-            <div className="w-10 h-10 relative flex-shrink-0">
-              <Image src="/images/icg-icon-white.png" alt="ICG icon" fill className="object-contain" />
-            </div>
-            <h1 className="text-white text-4xl font-semibold leading-[44px] tracking-tight mt-2">
-              Officer
-              <br />
-              Sign Up
-            </h1>
-            <p className="text-white text-lg font-normal leading-7 max-w-xs">
-              One last step — confirm your email to activate your officer account.
-            </p>
-          </div>
-          <p className="absolute bottom-8 left-0 right-0 text-center text-white text-sm leading-5 px-4">
-            © Irvine Consulting Group 2026. All Rights Reserved
-          </p>
-        </div>
-
-        <div className="flex-1 bg-white flex items-center justify-center px-8 py-12">
-          <div className="w-full max-w-[480px] flex flex-col items-center gap-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <polyline points="22,6 12,13 2,6" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <div className="flex flex-col gap-2">
-              <h2 className="text-[#061c2a] text-2xl font-semibold tracking-tight">Check your email</h2>
-              <p className="text-[#6b7280] text-base leading-relaxed">
-                We sent a confirmation link to <span className="font-medium text-[#111827]">{email}</span>.
-                Click it to activate your officer account, then sign in.
-              </p>
-            </div>
-            <Link
-              href="/officer/login"
-              className="text-[#061c2a] text-sm font-medium underline hover:text-[#0d2f47] transition-colors"
-            >
-              Back to sign in
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
   }
 
   return (

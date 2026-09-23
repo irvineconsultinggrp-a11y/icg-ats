@@ -1,3 +1,4 @@
+import { isKnownGroupInterviewSlot } from "@/lib/group-interview/sessions";
 import type { ApplicantRow } from "@/lib/types/database";
 
 export type PipelineStage =
@@ -179,7 +180,8 @@ export function parseOfficerApplicantPatch(
 }
 
 export function parseAvailableSlots(row: ApplicantRow): string[] {
-  return Array.isArray(row.available_slots) ? (row.available_slots as string[]) : [];
+  const raw = Array.isArray(row.available_slots) ? (row.available_slots as string[]) : [];
+  return raw.filter((id) => typeof id === "string" && isKnownGroupInterviewSlot(id));
 }
 
 export function rowToGroupInterview(row: ApplicantRow) {

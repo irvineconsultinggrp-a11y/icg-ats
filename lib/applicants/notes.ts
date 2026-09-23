@@ -14,20 +14,30 @@ export type ApplicantNoteRow = {
   updated_at: string;
 };
 
-/** A note plus whether the current viewer is its author (can edit/delete). */
-export type ApplicantNote = ApplicantNoteRow & { isMine: boolean };
+/** A note plus viewer permissions (edit own only; delete own or any if moderator). */
+export type ApplicantNote = ApplicantNoteRow & {
+  isMine: boolean;
+  canDelete: boolean;
+};
 
-export type NotesResponse = { data: ApplicantNote[]; error?: string };
+export type NotesResponse = {
+  data: ApplicantNote[];
+  viewerCanModerateNotes?: boolean;
+  error?: string;
+};
 
 export async function fetchApplicantNotes(
   applicantId: string,
-): Promise<{ data?: ApplicantNote[]; error?: string }> {
+): Promise<{ data?: ApplicantNote[]; viewerCanModerateNotes?: boolean; error?: string }> {
   const res = await fetch(`/api/applicants/${applicantId}/notes`, {
     credentials: "include",
   });
-  const body = (await res.json()) as { data?: ApplicantNote[]; error?: string };
+  const body = (await res.json()) as NotesResponse;
   if (!res.ok) return { error: body.error ?? "Failed to load notes." };
-  return { data: body.data ?? [] };
+  return {
+    data: body.data ?? [],
+    viewerCanModerateNotes: body.viewerCanModerateNotes,
+  };
 }
 
 export async function fetchApplicantNoteSignals(): Promise<{

@@ -2,16 +2,34 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 
-export default function OfficerLogin() {
+function OfficerLoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() => {
+    if (searchParams.get("error") === "auth") {
+      return "Sign in failed. Please try again.";
+    }
+    if (searchParams.get("error") === "role") {
+      return "This account does not have officer access.";
+    }
+    return "";
+  });
+  const [success] = useState(() => {
+    if (searchParams.get("created") === "1") {
+      return "Account created. Sign in with your email and password.";
+    }
+    if (searchParams.get("confirmed") === "1") {
+      return "You can sign in now.";
+    }
+    return "";
+  });
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -19,37 +37,43 @@ export default function OfficerLogin() {
     setError("");
     setLoading(true);
 
-    const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (signInError) {
-      setLoading(false);
-      const notConfirmed = /email not confirmed|not confirmed|confirm your email/i.test(
-        signInError.message,
-      );
+      if (signInError) {
+        const notConfirmed = /email not confirmed|not confirmed|confirm your email/i.test(
+          signInError.message,
+        );
+        setError(
+          notConfirmed
+            ? "Please confirm your email first — check your inbox for the confirmation link we sent when you signed up."
+            : signInError.message,
+        );
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.app_metadata?.role !== "officer") {
+        await supabase.auth.signOut();
+        setError("This account does not have officer access. If you're an officer, create your account with an invite code below.");
+        return;
+      }
+
+      router.push("/officer/dashboard");
+      router.refresh();
+    } catch (e) {
       setError(
-        notConfirmed
-          ? "Please confirm your email first — check your inbox for the confirmation link we sent when you signed up."
-          : signInError.message,
+        e instanceof Error
+          ? e.message
+          : "Could not reach the server. If this says “Failed to fetch”, check Vercel env vars and redeploy.",
       );
-      return;
-    }
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user?.app_metadata?.role !== "officer") {
-      await supabase.auth.signOut();
+    } finally {
       setLoading(false);
-      setError("This account does not have officer access. If you're an officer, create your account with an invite code below.");
-      return;
     }
-
-    setLoading(false);
-
-    router.push("/officer/dashboard");
-    router.refresh();
   }
 
   return (
@@ -194,6 +218,12 @@ export default function OfficerLogin() {
               </div>
             </div>
 
+            {success && (
+              <div className="flex items-center gap-2 rounded-[8px] bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
+                {success}
+              </div>
+            )}
+
             {/* Error message */}
             {error && (
               <div className="flex items-center gap-2 rounded-[8px] bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
@@ -231,5 +261,19 @@ export default function OfficerLogin() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function OfficerLogin() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-[#6b7280]">
+          Loading…
+        </div>
+      }
+    >
+      <OfficerLoginForm />
+    </Suspense>
   );
 }

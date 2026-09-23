@@ -11,7 +11,10 @@ export async function GET(request: Request) {
   const intent = searchParams.get("intent");
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/applicant/login?error=auth`);
+    const fallback = next.startsWith("/officer/")
+      ? `${origin}/officer/login?error=auth`
+      : `${origin}/applicant/login?error=auth`;
+    return NextResponse.redirect(fallback);
   }
 
   const cookieStore = await cookies();
@@ -19,11 +22,22 @@ export async function GET(request: Request) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
-    return NextResponse.redirect(`${origin}/applicant/login?error=auth`);
+    const fallback = next.startsWith("/officer/")
+      ? `${origin}/officer/login?error=auth`
+      : `${origin}/applicant/login?error=auth`;
+    return NextResponse.redirect(fallback);
+  }
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (intent === "officer") {
+    if (user?.app_metadata?.role !== "officer") {
+      await supabase.auth.signOut();
+      return NextResponse.redirect(`${origin}/officer/login?error=role`);
+    }
   }
 
   if (intent === "applicant") {
-    const { data: { user } } = await supabase.auth.getUser();
     if (user?.email && !isApplicantEmailAllowed(user.email)) {
       await supabase.auth.signOut();
       return NextResponse.redirect(
@@ -43,5 +57,6 @@ export async function GET(request: Request) {
   }
 
   const safeNext = next.startsWith("/") ? next : "/applicant/dashboard";
-  return NextResponse.redirect(`${origin}${safeNext}`);
+  const dest = new URL(safeNext, origin);
+  return NextResponse.redirect(dest);
 }

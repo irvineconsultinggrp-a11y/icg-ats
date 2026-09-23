@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isNotesModerator } from "@/lib/auth/notes-moderator";
 import { requireOfficer } from "@/lib/auth/session";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { parseNoteSignal } from "@/lib/applicants/note-signal";
@@ -8,6 +9,11 @@ const NOTE_COLUMNS =
   "id, applicant_id, author_user_id, author_name, title, body_html, signal, created_at, updated_at";
 
 type RouteContext = { params: Promise<{ id: string; noteId: string }> };
+
+function isNoteAuthor(authorUserId: string | null, userId: string): boolean {
+  if (!authorUserId) return false;
+  return authorUserId.toLowerCase() === userId.toLowerCase();
+}
 
 export async function PATCH(request: Request, context: RouteContext) {
   const { id, noteId } = await context.params;
@@ -32,7 +38,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     .maybeSingle();
 
   if (!existing) return NextResponse.json({ error: "Note not found" }, { status: 404 });
-  if (existing.author_user_id !== gate.user.id) {
+  if (!isNoteAuthor(existing.author_user_id, gate.user.id)) {
     return NextResponse.json({ error: "You can only edit your own notes." }, { status: 403 });
   }
 
@@ -74,7 +80,13 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: error?.message ?? "Failed to save note." }, { status: 500 });
   }
 
-  return NextResponse.json({ data: { ...data, isMine: true } });
+  return NextResponse.json({
+    data: {
+      ...data,
+      isMine: true,
+      canDelete: true,
+    },
+  });
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
@@ -93,7 +105,9 @@ export async function DELETE(_request: Request, context: RouteContext) {
     .maybeSingle();
 
   if (!existing) return NextResponse.json({ error: "Note not found" }, { status: 404 });
-  if (existing.author_user_id !== gate.user.id) {
+  const canDelete =
+    isNoteAuthor(existing.author_user_id, gate.user.id) || isNotesModerator(gate.user);
+  if (!canDelete) {
     return NextResponse.json({ error: "You can only delete your own notes." }, { status: 403 });
   }
 

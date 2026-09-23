@@ -3,6 +3,7 @@ import {
   MAX_RESUME_BYTES,
   sanitizeStorageFileName,
 } from "@/lib/applicants/queries";
+import { isKnownGroupInterviewSlot } from "@/lib/group-interview/sessions";
 import { canEditApplication } from "@/lib/positions";
 import type { ApplicantRow } from "@/lib/types/database";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -56,7 +57,9 @@ export function parseApplicationFormData(formData: FormData): ParsedApplicationF
       if (!Array.isArray(parsed)) {
         return { error: "availableSlots must be a JSON array" };
       }
-      availableSlots = parsed;
+      availableSlots = parsed.filter(
+        (id): id is string => typeof id === "string" && isKnownGroupInterviewSlot(id),
+      );
     } catch {
       return { error: "Invalid availableSlots JSON" };
     }

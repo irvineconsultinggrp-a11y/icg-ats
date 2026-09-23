@@ -10,6 +10,7 @@ import {
   selectColumnsForPipeline,
   type ApplicantPipelineParam,
 } from "@/lib/applicants/select-columns";
+import { sendTransactionalEmailToApplicant } from "@/lib/email/send-transactional-email";
 import { notifyApplicantCreated } from "@/lib/google-apps-script";
 import { canApplyToPosition } from "@/lib/positions";
 import { requireApplicant, requireOfficer } from "@/lib/auth/session";
@@ -198,5 +199,23 @@ export async function POST(request: Request) {
     },
   });
 
-  return NextResponse.json({ data: created }, { status: 201 });
+  let applicationReceivedEmail: { sent: boolean; error?: string } = { sent: false };
+  if (process.env.AUTO_SEND_APPLICATION_RECEIVED_EMAIL !== "false") {
+    const emailResult = await sendTransactionalEmailToApplicant({
+      applicantId: created.id,
+      templateId: "app-received",
+      sentBy: null,
+    });
+    if (emailResult.ok) {
+      applicationReceivedEmail = { sent: true };
+    } else {
+      console.error("[applicants POST] app-received email:", emailResult.error);
+      applicationReceivedEmail = { sent: false, error: emailResult.error };
+    }
+  }
+
+  return NextResponse.json(
+    { data: created, applicationReceivedEmail },
+    { status: 201 },
+  );
 }

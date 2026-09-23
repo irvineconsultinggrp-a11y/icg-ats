@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isNotesModerator } from "@/lib/auth/notes-moderator";
 import { requireOfficer } from "@/lib/auth/session";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { sanitizeNoteHtml, noteTextLength } from "@/lib/applicants/sanitize-html";
@@ -47,11 +48,17 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const notes = (data ?? []).map((n: ApplicantNoteRow) => ({
-    ...n,
-    isMine: n.author_user_id === gate.user.id,
-  }));
-  return NextResponse.json({ data: notes });
+  const viewerId = gate.user.id.toLowerCase();
+  const moderator = isNotesModerator(gate.user);
+  const notes = (data ?? []).map((n: ApplicantNoteRow) => {
+    const isMine = Boolean(n.author_user_id && n.author_user_id.toLowerCase() === viewerId);
+    return {
+      ...n,
+      isMine,
+      canDelete: isMine || moderator,
+    };
+  });
+  return NextResponse.json({ data: notes, viewerCanModerateNotes: moderator });
 }
 
 export async function POST(request: Request, context: RouteContext) {
@@ -119,5 +126,8 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: error?.message ?? "Failed to create note." }, { status: 500 });
   }
 
-  return NextResponse.json({ data: { ...data, isMine: true } }, { status: 201 });
+  return NextResponse.json(
+    { data: { ...data, isMine: true, canDelete: true } },
+    { status: 201 },
+  );
 }

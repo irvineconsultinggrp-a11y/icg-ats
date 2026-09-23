@@ -6,10 +6,10 @@ import { fetchApplicantsList } from "@/lib/applicants/stages";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import type { ApplicantRow } from "@/lib/types/database";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
-import {
-  LazyEmailTemplatesModal,
-  type EmailTemplate,
-} from "../_components/LazyEmailTemplatesModal";
+import { SendTransactionalEmailModal } from "@/components/email/SendTransactionalEmailModal";
+import { StatusChangeWithEmailDialog } from "@/components/email/StatusChangeWithEmailDialog";
+import { APPLICATION_EMAIL_UI } from "@/lib/email/transactional-templates";
+import { LazyEmailTemplatesModal } from "../_components/LazyEmailTemplatesModal";
 
 // --- Icons ---
 
@@ -110,61 +110,6 @@ function StatusBadge({ status }: { status: AppStatus }) {
   );
 }
 
-// --- Email templates ---
-
-const APP_EMAIL_TEMPLATES: EmailTemplate[] = [
-  {
-    id: "app-received",
-    name: "Application Received",
-    description: "Confirm receipt of application",
-    subject: "Your ICG Application Has Been Received",
-    html: `<p>Dear <strong>[First Name]</strong>,</p>
-<p>Thank you for applying to <strong>Irvine Consulting Group (ICG)</strong> for the <strong>Junior Associate</strong> position — Fall 2026.</p>
-<p>We have successfully received your application and our team will be reviewing it shortly. You can expect to hear back from us regarding next steps within the next <strong>1–2 weeks</strong>.</p>
-<p>In the meantime, if you have any questions, feel free to reach out by replying to this email.</p>
-<p>We appreciate your interest in ICG and look forward to learning more about you!</p>
-<p>Best regards,<br><strong>The ICG Recruitment Team</strong><br>Irvine Consulting Group | University of California, Irvine</p>`,
-    text: `Dear [First Name],
-
-Thank you for applying to Irvine Consulting Group (ICG) for the Junior Associate position — Fall 2026.
-
-We have successfully received your application and our team will be reviewing it shortly. You can expect to hear back from us regarding next steps within the next 1–2 weeks.
-
-In the meantime, if you have any questions, feel free to reach out by replying to this email.
-
-We appreciate your interest in ICG and look forward to learning more about you!
-
-Best regards,
-The ICG Recruitment Team
-Irvine Consulting Group | University of California, Irvine`,
-  },
-  {
-    id: "app-not-selected",
-    name: "Not Moving Forward",
-    description: "Early-stage rejection",
-    subject: "ICG Application Update",
-    html: `<p>Dear <strong>[First Name]</strong>,</p>
-<p>Thank you for your interest in <strong>Irvine Consulting Group (ICG)</strong> and for taking the time to apply for the <strong>Junior Associate</strong> position.</p>
-<p>After carefully reviewing your application, we regret to inform you that we will not be moving forward with your candidacy at this time. This was a competitive process, and this decision is in no way a reflection of your potential.</p>
-<p>We encourage you to apply again in a future recruitment cycle and wish you all the best in your academic and professional journey.</p>
-<p>Thank you again for your interest in ICG.</p>
-<p>Warm regards,<br><strong>The ICG Recruitment Team</strong><br>Irvine Consulting Group | University of California, Irvine</p>`,
-    text: `Dear [First Name],
-
-Thank you for your interest in Irvine Consulting Group (ICG) and for taking the time to apply for the Junior Associate position.
-
-After carefully reviewing your application, we regret to inform you that we will not be moving forward with your candidacy at this time. This was a competitive process, and this decision is in no way a reflection of your potential.
-
-We encourage you to apply again in a future recruitment cycle and wish you all the best in your academic and professional journey.
-
-Thank you again for your interest in ICG.
-
-Warm regards,
-The ICG Recruitment Team
-Irvine Consulting Group | University of California, Irvine`,
-  },
-];
-
 // --- Detail panel ---
 
 function DetailPanel({
@@ -172,6 +117,8 @@ function DetailPanel({
   resumeSignedUrl,
   onClose,
   onUpdate,
+  onRejectClick,
+  onSendReceivedClick,
   saveError,
   saving,
 }: {
@@ -179,6 +126,8 @@ function DetailPanel({
   resumeSignedUrl: string | null;
   onClose: () => void;
   onUpdate: (patch: Partial<Application>) => void;
+  onRejectClick: () => void;
+  onSendReceivedClick: () => void;
   saveError: string;
   saving: boolean;
 }) {
@@ -288,10 +237,18 @@ function DetailPanel({
           </button>
           <button
             type="button"
-            onClick={() => onUpdate({ status: "rejected" })}
-            className="flex items-center justify-center h-11 w-full border border-red-200 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 transition-colors"
+            onClick={onSendReceivedClick}
+            className="flex items-center justify-center h-10 w-full border border-[#061c2a] text-[#061c2a] text-sm font-medium rounded-lg hover:bg-[#061c2a]/5 transition-colors"
           >
-            Reject Application
+            Send application received email
+          </button>
+          <button
+            type="button"
+            onClick={onRejectClick}
+            disabled={applicant.status === "rejected"}
+            className="flex items-center justify-center h-11 w-full border border-red-200 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 transition-colors disabled:opacity-40"
+          >
+            {applicant.status === "rejected" ? "Rejected" : "Reject Application"}
           </button>
         </div>
       </div>
@@ -322,6 +279,8 @@ export default function ApplicationsPage() {
   const [activeTab, setActiveTab] = useState<StatusTab>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [receivedEmailOpen, setReceivedEmailOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
@@ -404,14 +363,14 @@ export default function ApplicationsPage() {
     })();
   }, [selectedId]);
 
-  async function updateApplication(id: string, patch: Partial<Application>) {
+  async function updateApplication(id: string, patch: Partial<Application>): Promise<boolean> {
     const previous = applications;
     setApplications((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
 
     const apiPatch: { app_status?: string; notes?: string } = {};
     if (patch.status !== undefined) apiPatch.app_status = patch.status;
     if (patch.notes !== undefined) apiPatch.notes = patch.notes;
-    if (Object.keys(apiPatch).length === 0) return;
+    if (Object.keys(apiPatch).length === 0) return true;
 
     setSaving(true);
     setSaveError("");
@@ -427,13 +386,11 @@ export default function ApplicationsPage() {
       if (!res.ok || !body.data) {
         setApplications(previous);
         setSaveError(body.error ?? "Failed to save changes.");
-        return;
+        return false;
       }
       setApplications((prev) =>
         prev.map((a) => (a.id === id ? rowToApplication(body.data!) : a)),
       );
-      // A status change moves the applicant between tabs — refresh the counts and,
-      // if a specific tab is active, re-fetch so the applicant drops out of the wrong tab.
       if (patch.status !== undefined) {
         void loadCounts();
         if (activeTab !== "all") {
@@ -441,9 +398,11 @@ export default function ApplicationsPage() {
           void loadApplications();
         }
       }
+      return true;
     } catch {
       setApplications(previous);
       setSaveError("Network error saving changes.");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -675,16 +634,41 @@ export default function ApplicationsPage() {
             resumeSignedUrl={resumeSignedUrl}
             onClose={() => setSelectedId(null)}
             onUpdate={(patch) => void updateApplication(selected.id, patch)}
+            onRejectClick={() => setRejectDialogOpen(true)}
+            onSendReceivedClick={() => setReceivedEmailOpen(true)}
             saveError={saveError}
             saving={saving}
           />
         )}
       </div>
 
+      {selected && (
+        <>
+          <StatusChangeWithEmailDialog
+            open={rejectDialogOpen}
+            onClose={() => setRejectDialogOpen(false)}
+            applicantId={selected.id}
+            templateId="app-not-selected"
+            actionLabel="Reject application"
+            onConfirmStatus={async () => {
+              const ok = await updateApplication(selected.id, { status: "rejected" });
+              if (!ok) throw new Error("Could not update status.");
+            }}
+          />
+          <SendTransactionalEmailModal
+            open={receivedEmailOpen}
+            onClose={() => setReceivedEmailOpen(false)}
+            applicantId={selected.id}
+            templateId="app-received"
+            title="Application received"
+          />
+        </>
+      )}
+
       <LazyEmailTemplatesModal
         isOpen={templatesOpen}
         onClose={() => setTemplatesOpen(false)}
-        templates={APP_EMAIL_TEMPLATES}
+        templates={APPLICATION_EMAIL_UI}
         title="Application Email Templates"
       />
     </main>

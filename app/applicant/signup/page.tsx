@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { OAuthButtons } from "@/components/applicant/oauth-buttons";
 import { APPLICANT_EMAIL_ERROR, isApplicantEmailAllowed } from "@/lib/auth/applicant-email";
-import { ensureApplicantRole, signUpWithPassword } from "@/utils/auth/applicant";
+import { signInWithPassword } from "@/utils/auth/applicant";
 
 export default function ApplicantSignup() {
   const router = useRouter();
@@ -20,8 +20,6 @@ export default function ApplicantSignup() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [emailSent, setEmailSent] = useState(false);
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -42,76 +40,30 @@ export default function ApplicantSignup() {
     }
 
     setLoading(true);
-    const { error: signUpError, data } = await signUpWithPassword(email, password, {
-      firstName,
-      lastName,
-    });
-    setLoading(false);
+    try {
+      const res = await fetch("/api/auth/applicant-signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ firstName, lastName, email, password }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? "Could not create your account.");
+        return;
+      }
 
-    if (signUpError) {
-      setError(signUpError.message);
-      return;
-    }
-
-    // Supabase returns a session immediately when email confirmation is disabled,
-    // otherwise data.session is null and we show the confirm-email message.
-    if (data.session) {
-      await ensureApplicantRole();
+      const { error: signInError } = await signInWithPassword(email, password);
+      if (signInError) {
+        setError(signInError.message);
+        return;
+      }
       router.push("/applicant/dashboard");
       router.refresh();
-    } else {
-      setEmailSent(true);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
     }
-  }
-
-  if (emailSent) {
-    return (
-      <div className="min-h-screen flex font-sans">
-        <div className="relative w-[36%] min-w-[280px] bg-[#061c2a] overflow-hidden flex-shrink-0">
-          <Image src="/images/cityscape.png" alt="" fill className="object-cover opacity-20" priority />
-          <div className="relative z-10 flex flex-col gap-3 px-12 pt-20">
-            <div className="w-10 h-10 relative flex-shrink-0">
-              <Image src="/images/icg-icon-white.png" alt="ICG icon" fill className="object-contain" />
-            </div>
-            <h1 className="text-white text-4xl font-semibold leading-[44px] tracking-tight mt-2">
-              ICG Application
-              <br />
-              Portal
-            </h1>
-            <p className="text-white text-lg font-normal leading-7 max-w-xs">
-              One last step — check your inbox to confirm your email.
-            </p>
-          </div>
-          <p className="absolute bottom-8 left-0 right-0 text-center text-white text-sm leading-5 px-4">
-            © Irvine Consulting Group 2026. All Rights Reserved
-          </p>
-        </div>
-
-        <div className="flex-1 bg-white flex items-center justify-center px-8 py-12">
-          <div className="w-full max-w-[480px] flex flex-col items-center gap-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <polyline points="22,6 12,13 2,6" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <div className="flex flex-col gap-2">
-              <h2 className="text-[#061c2a] text-2xl font-semibold tracking-tight">Check your email</h2>
-              <p className="text-[#6b7280] text-base leading-relaxed">
-                We sent a confirmation link to <span className="font-medium text-[#111827]">{email}</span>.
-                Click it to activate your account and sign in.
-              </p>
-            </div>
-            <Link
-              href="/applicant/login"
-              className="text-[#061c2a] text-sm font-medium underline hover:text-[#0d2f47] transition-colors"
-            >
-              Back to sign in
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
   }
 
   return (

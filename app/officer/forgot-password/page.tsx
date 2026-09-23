@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { passwordResetRedirect } from "@/lib/auth/password-reset-redirect";
 import { createClient } from "@/utils/supabase/client";
 
 export default function OfficerForgotPasswordPage() {
@@ -16,21 +17,30 @@ export default function OfficerForgotPasswordPage() {
     setMessage("");
     setLoading(true);
 
-    const supabase = createClient();
-    const origin =
-      typeof window !== "undefined"
-        ? window.location.origin
-        : "http://localhost:3000";
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${origin}/officer/login`,
-    });
+    try {
+      const supabase = createClient();
+      const origin =
+        typeof window !== "undefined"
+          ? window.location.origin
+          : "http://localhost:3000";
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: passwordResetRedirect(origin, "/officer/reset-password"),
+      });
 
-    setLoading(false);
-    if (resetError) {
-      setError(resetError.message);
-      return;
+      if (resetError) {
+        setError(resetError.message);
+        return;
+      }
+      setMessage("If an account exists for that email, a reset link has been sent.");
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Could not reach the server. Check your connection, then try again.",
+      );
+    } finally {
+      setLoading(false);
     }
-    setMessage("If an account exists for that email, a reset link has been sent.");
   }
 
   return (

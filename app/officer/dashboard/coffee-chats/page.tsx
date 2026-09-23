@@ -5,10 +5,12 @@ import { fetchPipelineApplicants } from "@/lib/applicants/stages";
 import type { ApplicantRow } from "@/lib/types/database";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import { SendTransactionalEmailModal } from "@/components/email/SendTransactionalEmailModal";
 import {
-  LazyEmailTemplatesModal,
-  type EmailTemplate,
-} from "../_components/LazyEmailTemplatesModal";
+  COFFEE_CHAT_EMAIL_UI,
+  type TransactionalEmailId,
+} from "@/lib/email/transactional-templates";
+import { LazyEmailTemplatesModal } from "../_components/LazyEmailTemplatesModal";
 import { getDefaultCoffeeChatCalendlyUrl } from "@/lib/calendly";
 import { NotesFolder } from "@/components/notes/NotesFolder";
 import { NoteSignalSummary } from "@/components/notes/NoteSignalPicker";
@@ -105,84 +107,18 @@ function rowToApplicantSummary(row: ApplicantRow): ApplicantListRow {
   };
 }
 
-// --- Email templates ---
-
-const CC_EMAIL_TEMPLATES: EmailTemplate[] = [
-  {
-    id: "cc-invitation",
-    name: "Coffee Chat Invite",
-    description: "Invite applicant to schedule a chat",
-    subject: "ICG Coffee Chat Invitation – [Date]",
-    html: `<p>Dear <strong>[First Name]</strong>,</p>
-<p>Congratulations on your performance at the <strong>ICG Group Interview</strong>! We were truly impressed and would like to invite you to a <strong>coffee chat</strong> with one of our officers as the next step in the recruitment process.</p>
-<p><strong>Coffee Chat Details</strong></p>
-<p><strong>Format:</strong> 1-on-1 informal conversation (~30 minutes)<br><strong>Date &amp; Time:</strong> [Date and Time]<br><strong>Location / Platform:</strong> [Zoom Link or In-Person Location]</p>
-<p>This is a wonderful opportunity for us to get to know you better and for you to ask any questions about life at <strong>ICG</strong>.</p>
-<p>Please reply to confirm your availability. If the proposed time doesn't work, don't hesitate to let us know and we'll find a time that suits you.</p>
-<p>We look forward to connecting with you!</p>
-<p>Warm regards,<br><strong>The ICG Recruitment Team</strong><br>Irvine Consulting Group | University of California, Irvine</p>`,
-    text: `Dear [First Name],
-
-Congratulations on your performance at the ICG Group Interview! We were truly impressed and would like to invite you to a coffee chat with one of our officers as the next step in the recruitment process.
-
-Coffee Chat Details
-Format: 1-on-1 informal conversation (~30 minutes)
-Date & Time: [Date and Time]
-Location / Platform: [Zoom Link or In-Person Location]
-
-This is a wonderful opportunity for us to get to know you better and for you to ask any questions about life at ICG.
-
-Please reply to confirm your availability. If the proposed time doesn't work, don't hesitate to let us know and we'll find a time that suits you.
-
-We look forward to connecting with you!
-
-Warm regards,
-The ICG Recruitment Team
-Irvine Consulting Group | University of California, Irvine`,
-  },
-  {
-    id: "cc-reminder",
-    name: "Chat Reminder",
-    description: "Day-before reminder",
-    subject: "Reminder: ICG Coffee Chat Tomorrow – [Time]",
-    html: `<p>Dear <strong>[First Name]</strong>,</p>
-<p>Just a friendly reminder that your <strong>ICG Coffee Chat</strong> is scheduled for <strong>tomorrow</strong>.</p>
-<p><strong>Date:</strong> [Date]<br><strong>Time:</strong> [Time]<br><strong>Location / Platform:</strong> [Zoom Link or In-Person Location]<br><strong>Your Officer:</strong> [Officer Name]</p>
-<p>There's nothing to prepare — just come ready for a relaxed conversation! Feel free to bring any questions you have about ICG, consulting, or the team.</p>
-<p>If anything comes up, please reply to this email as soon as possible.</p>
-<p>See you tomorrow!</p>
-<p>Best regards,<br><strong>The ICG Recruitment Team</strong><br>Irvine Consulting Group | University of California, Irvine</p>`,
-    text: `Dear [First Name],
-
-Just a friendly reminder that your ICG Coffee Chat is scheduled for tomorrow.
-
-Date: [Date]
-Time: [Time]
-Location / Platform: [Zoom Link or In-Person Location]
-Your Officer: [Officer Name]
-
-There's nothing to prepare — just come ready for a relaxed conversation! Feel free to bring any questions you have about ICG, consulting, or the team.
-
-If anything comes up, please reply to this email as soon as possible.
-
-See you tomorrow!
-
-Best regards,
-The ICG Recruitment Team
-Irvine Consulting Group | University of California, Irvine`,
-  },
-];
-
 // --- Detail panel ---
 
 function DetailPanel({
   applicant,
   onClose,
   onRatingChange,
+  onSendEmail,
 }: {
   applicant: ApplicantSummary;
   onClose: () => void;
   onRatingChange: () => void;
+  onSendEmail: (templateId: TransactionalEmailId) => void;
 }) {
   const initials = `${applicant.firstName[0]}${applicant.lastName[0]}`;
 
@@ -219,12 +155,29 @@ function DetailPanel({
           ))}
         </div>
 
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => onSendEmail("cc-invitation")}
+            className="h-10 w-full rounded-lg bg-[#061c2a] text-white text-sm font-medium hover:bg-[#0d2f47]"
+          >
+            Send coffee chat invite
+          </button>
+          <button
+            type="button"
+            onClick={() => onSendEmail("cc-reminder")}
+            className="h-10 w-full rounded-lg border border-[#061c2a] text-[#061c2a] text-sm font-medium hover:bg-[#061c2a]/5"
+          >
+            Send chat reminder
+          </button>
+        </div>
+
         <NotesFolder
           applicantId={applicant.id}
           applicantName={`${applicant.firstName} ${applicant.lastName}`}
           newNotePreset="coffee-chat"
           onRatingChange={onRatingChange}
-          hint="Pick green, yellow, or red on your note. Everyone can read all notes; you only edit your own."
+          hint="Pick green, yellow, or red on your note. Everyone can read all notes; only you can edit or delete yours."
         />
       </div>
     </div>
@@ -242,6 +195,8 @@ export default function CoffeeChatsPage() {
   const debouncedSearch = useDebouncedValue(search);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [sendEmailOpen, setSendEmailOpen] = useState(false);
+  const [sendTemplateId, setSendTemplateId] = useState<TransactionalEmailId>("cc-invitation");
   const [ratingSort, setRatingSort] = useState<RatingSort>("greens_desc");
   const [signalByApplicant, setSignalByApplicant] = useState<Record<string, NoteSignalCounts>>({});
   const [loading, setLoading] = useState(true);
@@ -518,14 +473,27 @@ export default function CoffeeChatsPage() {
             }}
             onClose={() => setSelectedId(null)}
             onRatingChange={() => void refreshSignals()}
+            onSendEmail={(templateId) => {
+              setSendTemplateId(templateId);
+              setSendEmailOpen(true);
+            }}
           />
         )}
       </div>
 
+      {selected && (
+        <SendTransactionalEmailModal
+          open={sendEmailOpen}
+          onClose={() => setSendEmailOpen(false)}
+          applicantId={selected.id}
+          templateId={sendTemplateId}
+        />
+      )}
+
       <LazyEmailTemplatesModal
         isOpen={templatesOpen}
         onClose={() => setTemplatesOpen(false)}
-        templates={CC_EMAIL_TEMPLATES}
+        templates={COFFEE_CHAT_EMAIL_UI}
         title="Coffee Chat Email Templates"
       />
     </main>

@@ -64,6 +64,9 @@ export function NotesFolder({
   const [editing, setEditing] = useState<ApplicantNote | "new" | null>(null);
   const [newDraft, setNewDraft] = useState<{ title: string; bodyHtml: string } | null>(null);
   const [startingNote, setStartingNote] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [viewerCanModerateNotes, setViewerCanModerateNotes] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -71,6 +74,7 @@ export function NotesFolder({
     const res = await fetchApplicantNotes(applicantId);
     if (res.error) setError(res.error);
     setNotes(res.data ?? []);
+    setViewerCanModerateNotes(res.viewerCanModerateNotes ?? false);
     setLoading(false);
   }, [applicantId]);
 
@@ -80,17 +84,29 @@ export function NotesFolder({
 
   function upsertLocal(note: ApplicantNote) {
     setNotes((prev) => {
+      const withPerms: ApplicantNote = {
+        ...note,
+        canDelete: note.canDelete ?? note.isMine ?? viewerCanModerateNotes,
+      };
       const idx = prev.findIndex((n) => n.id === note.id);
-      const next = idx >= 0 ? prev.map((n) => (n.id === note.id ? note : n)) : [note, ...prev];
+      const next =
+        idx >= 0 ? prev.map((n) => (n.id === note.id ? withPerms : n)) : [withPerms, ...prev];
       return [...next].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
     });
   }
 
   async function handleDelete(note: ApplicantNote) {
-    if (!confirm("Delete this note? This cannot be undone.")) return;
+    setConfirmDeleteId(null);
+    setDeletingId(note.id);
+    setError("");
     const prev = notes;
     setNotes((n) => n.filter((x) => x.id !== note.id));
+    if (editing !== null && editing !== "new" && editing.id === note.id) {
+      setEditing(null);
+      setNewDraft(null);
+    }
     const res = await deleteApplicantNote(applicantId, note.id);
+    setDeletingId(null);
     if (res.error) {
       setNotes(prev);
       setError(res.error);
@@ -144,7 +160,9 @@ export function NotesFolder({
 
       <p className="text-xs text-[#6b7280]">
         {hint ??
-          "Each member keeps their own note on this applicant. You can read everyone's; you can edit only your own."}
+          (viewerCanModerateNotes
+            ? "You can remove any note on this applicant. You can only edit notes you wrote."
+            : "Each member keeps their own note on this applicant. You can read everyone's; only you can edit or delete yours.")}
       </p>
 
       {error && (
@@ -174,8 +192,12 @@ export function NotesFolder({
             <NoteCard
               key={note.id}
               note={note}
+              confirmDelete={confirmDeleteId === note.id}
+              deleting={deletingId === note.id}
               onOpen={() => setEditing(note)}
-              onDelete={() => handleDelete(note)}
+              onRequestDelete={() => setConfirmDeleteId(note.id)}
+              onCancelDelete={() => setConfirmDeleteId(null)}
+              onConfirmDelete={() => void handleDelete(note)}
             />
           ))}
         </div>
@@ -197,6 +219,11 @@ export function NotesFolder({
             upsertLocal(n);
             onRatingChange?.();
           }}
+          onDelete={
+            editing !== "new" && editing.canDelete
+              ? () => void handleDelete(editing)
+              : undefined
+          }
         />
       )}
     </div>
@@ -207,41 +234,80 @@ export function NotesFolder({
 
 function NoteCard({
   note,
+  confirmDelete,
+  deleting,
   onOpen,
-  onDelete,
+  onRequestDelete,
+  onCancelDelete,
+  onConfirmDelete,
 }: {
   note: ApplicantNote;
+  confirmDelete: boolean;
+  deleting: boolean;
   onOpen: () => void;
-  onDelete: () => void;
+  onRequestDelete: () => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: () => void;
 }) {
   const snippet = textSnippet(note.body_html);
   return (
-    <div className="group relative rounded-lg border border-[#e4e4e7] bg-white p-3 hover:border-[#061c2a]/40 hover:shadow-sm transition-all">
-      <button type="button" onClick={onOpen} className="w-full text-left">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#061c2a] text-white text-[10px] font-bold flex-shrink-0">
-            {initialsOf(note.author_name)}
-          </span>
-          <span className="text-xs font-medium text-[#374151] truncate">{note.author_name}</span>
-          {note.signal && <NoteSignalDot signal={note.signal} />}
-          {note.isMine && (
-            <span className="text-[10px] font-semibold text-[#061c2a] bg-[#061c2a]/10 rounded px-1.5 py-0.5">You</span>
-          )}
-          <span className="ml-auto text-[11px] text-[#a1a1aa] flex-shrink-0">{relativeTime(note.updated_at)}</span>
-        </div>
-        {note.title && <p className="text-sm font-semibold text-[#111827] truncate">{note.title}</p>}
-        <p className="text-xs text-[#6b7280] line-clamp-2">{snippet || "No content"}</p>
-      </button>
-      {note.isMine && (
-        <button
-          type="button"
-          onClick={onDelete}
-          title="Delete note"
-          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-[#a1a1aa] hover:text-red-600 transition-all text-xs"
-        >
-          Delete
+    <div className="rounded-lg border border-[#e4e4e7] bg-white p-3 hover:border-[#061c2a]/40 hover:shadow-sm transition-all">
+      <div className="flex items-start gap-2">
+        <button type="button" onClick={onOpen} className="flex-1 min-w-0 text-left">
+          <div className="flex items-center gap-2 mb-1 pr-2">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#061c2a] text-white text-[10px] font-bold flex-shrink-0">
+              {initialsOf(note.author_name)}
+            </span>
+            <span className="text-xs font-medium text-[#374151] truncate">{note.author_name}</span>
+            {note.signal && <NoteSignalDot signal={note.signal} />}
+            {note.isMine && (
+              <span className="text-[10px] font-semibold text-[#061c2a] bg-[#061c2a]/10 rounded px-1.5 py-0.5">You</span>
+            )}
+            <span className="ml-auto text-[11px] text-[#a1a1aa] flex-shrink-0">{relativeTime(note.updated_at)}</span>
+          </div>
+          {note.title && <p className="text-sm font-semibold text-[#111827] truncate">{note.title}</p>}
+          <p className="text-xs text-[#6b7280] line-clamp-2">{snippet || "No content"}</p>
         </button>
-      )}
+        {note.canDelete && (
+          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+            {confirmDelete ? (
+              <div className="flex flex-col items-end gap-1">
+                <span className="text-[10px] text-[#6b7280] max-w-[88px] text-right leading-tight">
+                  {note.isMine ? "Delete this note?" : "Remove this note?"}
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={onCancelDelete}
+                    disabled={deleting}
+                    className="h-7 px-2 rounded-md border border-[#e4e4e7] text-[11px] font-medium text-[#374151] hover:bg-[#f4f4f5] disabled:opacity-60"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onConfirmDelete}
+                    disabled={deleting}
+                    className="h-7 px-2 rounded-md bg-red-600 text-white text-[11px] font-medium hover:bg-red-700 disabled:opacity-60"
+                  >
+                    {deleting ? "…" : "Delete"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={onRequestDelete}
+                disabled={deleting}
+                title="Delete your note"
+                className="h-7 px-2 rounded-md text-[11px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+              >
+                Delete
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -257,6 +323,7 @@ function NoteEditorModal({
   draft,
   onClose,
   onSaved,
+  onDelete,
 }: {
   applicantId: string;
   applicantName: string;
@@ -264,6 +331,7 @@ function NoteEditorModal({
   draft?: { title: string; bodyHtml: string } | null;
   onClose: () => void;
   onSaved: (note: ApplicantNote) => void;
+  onDelete?: () => void;
 }) {
   const readOnly = note !== null && !note.isMine;
   const [title, setTitle] = useState(note?.title ?? draft?.title ?? "");
@@ -272,6 +340,7 @@ function NoteEditorModal({
   const [noteId, setNoteId] = useState<string | null>(note?.id ?? null);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState("");
+  const [confirmDeleteInModal, setConfirmDeleteInModal] = useState(false);
 
   const savingRef = useRef(false);
   const skipUnmountFlushRef = useRef(false);
@@ -358,7 +427,39 @@ function NoteEditorModal({
             <span className="text-xs text-[#6b7280]">by {note.author_name}</span>
           )}
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {!readOnly && onDelete && noteId && (
+            confirmDeleteInModal ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[#6b7280]">Delete this note?</span>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteInModal(false)}
+                  className="h-9 px-3 rounded-lg border border-[#e4e4e7] text-sm text-[#374151] hover:bg-[#f4f4f5]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    skipUnmountFlushRef.current = true;
+                    onDelete();
+                  }}
+                  className="h-9 px-3 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700"
+                >
+                  Delete
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteInModal(true)}
+                className="h-9 px-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50"
+              >
+                Delete note
+              </button>
+            )
+          )}
           <span className={`text-xs font-medium ${status === "error" ? "text-red-600" : "text-[#6b7280]"}`}>
             {statusLabel}
           </span>

@@ -8,6 +8,11 @@ import {
 } from "@/lib/applicants/stages";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import { BatchEmailCampaignModal } from "@/components/email/BatchEmailCampaignModal";
+import {
+  fetchScheduleEmailSendsClient,
+  type ScheduleEmailSendRecord,
+} from "@/lib/email/schedule-email-sends";
 
 type Attendee = ReturnType<typeof rowToBbqAttendee>;
 
@@ -16,6 +21,8 @@ export default function BbqSocialPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [scheduleEmailSends, setScheduleEmailSends] = useState<ScheduleEmailSendRecord[]>([]);
   const debouncedSearch = useDebouncedValue(search);
 
   const load = useCallback(async () => {
@@ -28,6 +35,8 @@ export default function BbqSocialPage() {
     } else {
       setAttendees((result.data ?? []).map(rowToBbqAttendee));
     }
+    const sends = await fetchScheduleEmailSendsClient("bbq");
+    if (!sends.error) setScheduleEmailSends(sends.records);
     setLoading(false);
   }, [debouncedSearch]);
 
@@ -57,9 +66,19 @@ export default function BbqSocialPage() {
               Everyone accepted to the BBQ social night — a no-technicals event. Accept applicants from Round 2.
             </p>
           </div>
-          <div className="rounded-lg border border-[#e4e4e7] px-5 py-2 text-center">
-            <p className="text-2xl font-bold text-[#061c2a]">{attendees.length}</p>
-            <p className="text-[11px] uppercase tracking-wide text-[#a1a1aa]">Invited</p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              disabled={loading || attendees.length === 0}
+              onClick={() => setEmailModalOpen(true)}
+              className="h-10 px-4 rounded-lg bg-[#061c2a] text-white text-sm font-medium hover:bg-[#0d2f47] disabled:opacity-50"
+            >
+              Send email
+            </button>
+            <div className="rounded-lg border border-[#e4e4e7] px-5 py-2 text-center">
+              <p className="text-2xl font-bold text-[#061c2a]">{attendees.length}</p>
+              <p className="text-[11px] uppercase tracking-wide text-[#a1a1aa]">Invited</p>
+            </div>
           </div>
         </div>
 
@@ -103,6 +122,14 @@ export default function BbqSocialPage() {
           </div>
         )}
       </div>
+
+      <BatchEmailCampaignModal
+        open={emailModalOpen}
+        onClose={() => setEmailModalOpen(false)}
+        campaign="bbq"
+        emailSends={scheduleEmailSends}
+        onSent={() => void load()}
+      />
     </main>
   );
 }
