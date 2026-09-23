@@ -156,7 +156,7 @@ export default function OfficerDashboardHome() {
 
   return (
     <main className="flex-1 overflow-y-auto">
-      <div className="px-8 py-8 max-w-5xl flex flex-col gap-8">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-5xl flex flex-col gap-6 sm:gap-8">
         {/* Header */}
         <div>
           <p className="text-sm text-[#6b7280] font-medium">Fall 2026 Recruitment</p>

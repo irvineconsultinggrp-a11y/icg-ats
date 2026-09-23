@@ -9,6 +9,7 @@ import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import { SendTransactionalEmailModal } from "@/components/email/SendTransactionalEmailModal";
 import { StatusChangeWithEmailDialog } from "@/components/email/StatusChangeWithEmailDialog";
 import { APPLICATION_EMAIL_UI } from "@/lib/email/transactional-templates";
+import { OFFICER_DETAIL_PANEL_CLASS } from "@/components/layout/DashboardMobileShell";
 import { LazyEmailTemplatesModal } from "../_components/LazyEmailTemplatesModal";
 
 // --- Icons ---
@@ -139,7 +140,7 @@ function DetailPanel({
   }, [applicant.id, applicant.notes]);
 
   return (
-    <div className="w-[380px] flex-shrink-0 border-l border-[#e4e4e7] bg-white flex flex-col h-screen sticky top-0 overflow-y-auto">
+    <div className={OFFICER_DETAIL_PANEL_CLASS}>
       <div className="flex items-center justify-between px-6 py-5 border-b border-[#e4e4e7]">
         <h3 className="text-base font-semibold text-[#111827]">Application Detail</h3>
         <button type="button" onClick={onClose} className="text-[#a1a1aa] hover:text-[#374151] transition-colors" aria-label="Close">
@@ -439,7 +440,7 @@ export default function ApplicationsPage() {
   return (
     <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
       {/* Top bar */}
-      <div className="px-8 pt-8 pb-0 flex flex-col gap-6">
+      <div className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-0 flex flex-col gap-4 lg:gap-6">
         {/* Breadcrumb */}
         <div className="flex items-center gap-1.5 text-sm text-[#6b7280]">
           <span>Recruitment</span>
@@ -448,17 +449,17 @@ export default function ApplicationsPage() {
         </div>
 
         {/* Title + actions + stats */}
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-[#061c2a]">Applications</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-[#061c2a]">Applications</h1>
             <p className="text-sm text-[#6b7280] mt-1">Fall 2026 · Junior Associate</p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => setTemplatesOpen(true)}
-              className="flex items-center gap-2 h-9 px-4 border border-[#e4e4e7] bg-white rounded-lg text-sm font-medium text-[#374151] hover:border-[#9ca3af] hover:bg-[#f9fafb] transition-colors"
+              className="flex items-center gap-2 h-9 px-3 sm:px-4 border border-[#e4e4e7] bg-white rounded-lg text-sm font-medium text-[#374151] hover:border-[#9ca3af] hover:bg-[#f9fafb] transition-colors"
             >
               <MailIcon />
               Email Templates
@@ -479,8 +480,8 @@ export default function ApplicationsPage() {
         </div>
 
         {/* Status tabs + search */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-1 border-b border-[#e4e4e7] -mb-px">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <div className="flex items-center gap-1 border-b border-[#e4e4e7] -mb-px overflow-x-auto max-w-full">
             {STATUS_TABS.map((tab) => (
               <button
                 key={tab.key}
@@ -502,7 +503,7 @@ export default function ApplicationsPage() {
             ))}
           </div>
 
-          <div className="relative flex-shrink-0 w-[260px]">
+          <div className="relative flex-shrink-0 w-full sm:w-[260px]">
             <input
               type="text"
               value={search}
@@ -516,8 +517,10 @@ export default function ApplicationsPage() {
       </div>
 
       {/* Table */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 overflow-y-auto px-8 py-4">
+      <div className="flex flex-1 min-h-0 overflow-hidden flex-col lg:flex-row">
+        <div
+          className={`flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 min-h-0 ${selected ? "max-lg:hidden" : ""}`}
+        >
             {loading ? (
               <TableSkeleton rows={10} />
             ) : loadError ? (

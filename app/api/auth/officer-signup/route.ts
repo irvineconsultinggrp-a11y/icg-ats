@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  ensureAuthUserEmailConfirmed,
   findAuthUserByEmail,
   officerInviteCodeMatches,
   upsertOfficerProfile,
@@ -110,37 +111,64 @@ export async function POST(request: Request) {
     }
 
     if (existing.app_metadata?.role === "officer") {
-      return NextResponse.json(
-        {
-          error:
-            "This email already has an officer account. Sign in at Officer Login, or use Forgot password.",
+      if (existing.email_confirmed_at) {
+        return NextResponse.json(
+          {
+            error:
+              "This email already has an officer account. Sign in at Officer Login, or use Forgot password.",
+          },
+          { status: 409 },
+        );
+      }
+
+      const { error: confirmExistingError } = await admin.auth.admin.updateUserById(existing.id, {
+        password,
+        email_confirm: true,
+        user_metadata: {
+          ...existing.user_metadata,
+          full_name: fullName,
+          first_name: firstName,
+          last_name: lastName,
         },
-        { status: 409 },
-      );
+        app_metadata: { ...existing.app_metadata, role: "officer" },
+      });
+
+      if (confirmExistingError) {
+        console.error("[officer-signup reconfirm-officer]", confirmExistingError);
+        return NextResponse.json({ error: confirmExistingError.message }, { status: 500 });
+      }
+
+      userId = existing.id;
+    } else {
+
+      const { error: updateError } = await admin.auth.admin.updateUserById(existing.id, {
+        password,
+        email_confirm: true,
+        user_metadata: {
+          ...existing.user_metadata,
+          full_name: fullName,
+          first_name: firstName,
+          last_name: lastName,
+        },
+        app_metadata: { ...existing.app_metadata, role: "officer" },
+      });
+
+      if (updateError) {
+        console.error("[officer-signup upgradeUser]", updateError);
+        return NextResponse.json({ error: updateError.message }, { status: 500 });
+      }
+
+      userId = existing.id;
     }
-
-    const { error: updateError } = await admin.auth.admin.updateUserById(existing.id, {
-      password,
-      email_confirm: true,
-      user_metadata: {
-        ...existing.user_metadata,
-        full_name: fullName,
-        first_name: firstName,
-        last_name: lastName,
-      },
-      app_metadata: { ...existing.app_metadata, role: "officer" },
-    });
-
-    if (updateError) {
-      console.error("[officer-signup upgradeUser]", updateError);
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
-    }
-
-    userId = existing.id;
   }
 
   if (!userId) {
     return NextResponse.json({ error: "Account was not created." }, { status: 500 });
+  }
+
+  const confirmed = await ensureAuthUserEmailConfirmed(admin, userId);
+  if (confirmed.error) {
+    console.error("[officer-signup ensureConfirmed]", confirmed.error);
   }
 
   const profile = await upsertOfficerProfile(admin, {

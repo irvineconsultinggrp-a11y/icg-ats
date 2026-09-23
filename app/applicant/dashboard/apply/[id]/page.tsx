@@ -323,7 +323,7 @@ export default function ApplicationForm() {
   }
 
   return (
-    <main className="flex-1 px-8 py-[99px] overflow-y-auto">
+    <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 sm:py-10 lg:py-12 overflow-y-auto">
         <div className="max-w-[1079px] flex flex-col gap-8">
           {/* Header */}
           <div className="flex flex-col gap-3">

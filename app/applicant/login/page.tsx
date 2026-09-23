@@ -2,11 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { AuthSplitLayout } from "@/components/layout/AuthSplitLayout";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { OAuthButtons } from "@/components/applicant/oauth-buttons";
 import { APPLICANT_EMAIL_ERROR, isApplicantEmailAllowed } from "@/lib/auth/applicant-email";
-import { APPLICANT_DASHBOARD, ensureApplicantRole, signInWithPassword } from "@/utils/auth/applicant";
+import { signInWithPasswordNoEmailConfirm } from "@/lib/auth/portal-sign-in";
+import { APPLICANT_DASHBOARD, ensureApplicantRole } from "@/utils/auth/applicant";
 import { createClient } from "@/utils/supabase/client";
 
 function ApplicantLoginForm() {
@@ -27,9 +29,7 @@ function ApplicantLoginForm() {
     }
     return "";
   });
-  const [success] = useState<string>(() =>
-    searchParams.get("confirmed") === "1" ? "Email confirmed! You can sign in now." : ""
-  );
+  const [success] = useState("");
   const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
@@ -80,7 +80,13 @@ function ApplicantLoginForm() {
       return;
     }
 
-    const { error: signInError } = await signInWithPassword(email, password);
+    const supabase = createClient();
+    const { error: signInError } = await signInWithPasswordNoEmailConfirm(
+      supabase,
+      email,
+      password,
+      "applicant",
+    );
     setLoading(false);
 
     if (signInError) {
@@ -235,68 +241,48 @@ function ApplicantLoginForm() {
 
 export default function ApplicantLogin() {
   return (
-    <div className="min-h-screen flex font-sans">
-      {/* Left panel */}
-      <div className="relative w-[36%] min-w-[280px] bg-[#061c2a] overflow-hidden flex-shrink-0">
-        <Image
-          src="/images/cityscape.png"
-          alt=""
-          fill
-          className="object-cover opacity-20"
-          priority
-        />
-        <div className="relative z-10 flex flex-col gap-3 px-12 pt-20">
-          <div className="w-10 h-10 relative flex-shrink-0">
-            <Image src="/images/icg-icon-white.png" alt="ICG icon" fill className="object-contain" />
+    <AuthSplitLayout
+      wide
+      title={
+        <>
+          ICG Application
+          <br />
+          Portal
+        </>
+      }
+      subtitle="Sign in with your email or Google account."
+    >
+      <div className="w-full flex flex-col gap-4">
+        <Link
+          href="/"
+          className="text-sm text-[#6b7280] hover:text-[#061c2a] transition-colors flex items-center gap-1"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Back
+        </Link>
+        <div className="w-full border border-[#e4e4e7] rounded-[20px] sm:rounded-[26px] p-6 sm:p-10 lg:p-12 flex flex-col items-center gap-8 sm:gap-10">
+          <div className="relative w-full max-w-[360px] h-[100px] sm:h-[145px]">
+            <Image
+              src="/images/icg-logo.png"
+              alt="Irvine Consulting Group"
+              fill
+              className="object-contain"
+              priority
+            />
           </div>
-          <h1 className="text-white text-4xl font-semibold leading-[44px] tracking-tight mt-2">
-            ICG Application
-            <br />
-            Portal
-          </h1>
-          <p className="text-white text-lg font-normal leading-7 max-w-xs">
-            Sign in with your email or Google account.
-          </p>
-        </div>
-        <p className="absolute bottom-8 left-0 right-0 text-center text-white text-sm leading-5 px-4">
-          © Irvine Consulting Group 2026. All Rights Reserved
-        </p>
-      </div>
-
-      {/* Right panel */}
-      <div className="flex-1 bg-white flex items-center justify-center px-8 py-12">
-        <div className="w-full max-w-[540px] flex flex-col gap-4">
-          <Link
-            href="/"
-            className="text-sm text-[#6b7280] hover:text-[#061c2a] transition-colors flex items-center gap-1"
+          <Suspense
+            fallback={
+              <div className="w-full h-48 flex items-center justify-center text-[#a1a1aa]">
+                Loading…
+              </div>
+            }
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Back
-          </Link>
-          <div className="w-full border border-[#e4e4e7] rounded-[26px] p-12 flex flex-col items-center gap-10">
-            <div className="relative w-full max-w-[360px] h-[145px]">
-              <Image
-                src="/images/icg-logo.png"
-                alt="Irvine Consulting Group"
-                fill
-                className="object-contain"
-                priority
-              />
-            </div>
-            <Suspense
-              fallback={
-                <div className="w-full h-48 flex items-center justify-center text-[#a1a1aa]">
-                  Loading…
-                </div>
-              }
-            >
-              <ApplicantLoginForm />
-            </Suspense>
-          </div>
+            <ApplicantLoginForm />
+          </Suspense>
         </div>
       </div>
-    </div>
+    </AuthSplitLayout>
   );
 }

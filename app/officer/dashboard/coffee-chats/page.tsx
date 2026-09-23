@@ -10,6 +10,7 @@ import {
   COFFEE_CHAT_EMAIL_UI,
   type TransactionalEmailId,
 } from "@/lib/email/transactional-templates";
+import { OFFICER_DETAIL_PANEL_CLASS } from "@/components/layout/DashboardMobileShell";
 import { LazyEmailTemplatesModal } from "../_components/LazyEmailTemplatesModal";
 import { getDefaultCoffeeChatCalendlyUrl } from "@/lib/calendly";
 import { NotesFolder } from "@/components/notes/NotesFolder";
@@ -123,7 +124,7 @@ function DetailPanel({
   const initials = `${applicant.firstName[0]}${applicant.lastName[0]}`;
 
   return (
-    <div className="w-[380px] flex-shrink-0 border-l border-[#e4e4e7] bg-white flex flex-col h-screen sticky top-0 overflow-y-auto">
+    <div className={OFFICER_DETAIL_PANEL_CLASS}>
       <div className="flex items-center justify-between px-6 py-5 border-b border-[#e4e4e7]">
         <h3 className="text-base font-semibold text-[#111827]">Applicant Detail</h3>
         <button type="button" onClick={onClose} className="text-[#a1a1aa] hover:text-[#374151] transition-colors" aria-label="Close">
@@ -271,16 +272,16 @@ export default function CoffeeChatsPage() {
   return (
     <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
       {/* Top bar */}
-      <div className="px-8 pt-8 pb-0 flex flex-col gap-6">
+      <div className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-0 flex flex-col gap-4 lg:gap-6">
         <div className="flex items-center gap-1.5 text-sm text-[#6b7280]">
           <span>Recruitment</span>
           <ChevronRightIcon />
           <span className="font-medium text-[#111827]">Coffee Chats</span>
         </div>
 
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-[#061c2a]">Coffee Chats</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-[#061c2a]">Coffee Chats</h1>
             <p className="text-sm text-[#6b7280] mt-1">Fall 2026 · Junior Associate</p>
           </div>
 
@@ -301,7 +302,7 @@ export default function CoffeeChatsPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-[#e4e4e7] bg-[#fafafa] px-5 py-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-[#e4e4e7] bg-[#fafafa] px-4 sm:px-5 py-4">
           <div>
             <p className="text-sm font-semibold text-[#111827]">Scheduling via Calendly</p>
             <p className="text-xs text-[#6b7280] mt-0.5">
@@ -313,7 +314,7 @@ export default function CoffeeChatsPage() {
               href={calendlyUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 h-9 px-4 bg-[#061c2a] text-white text-sm font-medium rounded-lg hover:bg-[#0d2f47] transition-colors flex-shrink-0"
+              className="inline-flex items-center justify-center gap-2 h-9 px-4 bg-[#061c2a] text-white text-sm font-medium rounded-lg hover:bg-[#0d2f47] transition-colors flex-shrink-0 w-full sm:w-auto"
             >
               Open Calendly
             </a>
@@ -324,8 +325,8 @@ export default function CoffeeChatsPage() {
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-4">
-          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto sm:ml-auto">
             <label className="sr-only" htmlFor="cc-rating-sort">
               Sort applicants
             </label>
@@ -333,7 +334,7 @@ export default function CoffeeChatsPage() {
               id="cc-rating-sort"
               value={ratingSort}
               onChange={(e) => setRatingSort(e.target.value as RatingSort)}
-              className="h-9 border border-[#d4d4d8] rounded-lg px-3 text-sm text-[#374151] bg-white outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 max-w-[240px]"
+              className="h-9 border border-[#d4d4d8] rounded-lg px-3 text-sm text-[#374151] bg-white outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 w-full sm:max-w-[240px]"
             >
               {RATING_SORT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -341,7 +342,7 @@ export default function CoffeeChatsPage() {
                 </option>
               ))}
             </select>
-            <div className="relative w-[260px]">
+            <div className="relative w-full sm:w-[260px]">
               <input
                 type="text"
                 value={search}
@@ -356,8 +357,10 @@ export default function CoffeeChatsPage() {
       </div>
 
       {/* Table */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 overflow-y-auto px-8 py-4">
+      <div className="flex flex-1 min-h-0 overflow-hidden flex-col lg:flex-row">
+        <div
+          className={`flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 min-h-0 ${selectedId ? "max-lg:hidden" : ""}`}
+        >
           {loading ? (
             <TableSkeleton rows={10} />
           ) : loadError ? (

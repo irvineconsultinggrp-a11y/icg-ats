@@ -18,6 +18,7 @@ import {
 import type { ApplicantStats, RoundStatusCounts } from "@/app/api/applicants/stats/route";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { StatusChangeWithEmailDialog } from "@/components/email/StatusChangeWithEmailDialog";
+import { OFFICER_DETAIL_PANEL_CLASS } from "@/components/layout/DashboardMobileShell";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import type { TransactionalEmailId } from "@/lib/email/transactional-templates";
 
@@ -251,13 +252,13 @@ export function RoundBoard({
 
   return (
     <main className="flex-1 overflow-y-auto">
-      <div className="px-8 py-8 flex flex-col gap-6">
+      <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 flex flex-col gap-4 lg:gap-6">
         <RecruitmentPipelineStrip current={pipelineStep} />
 
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
             <p className="text-sm text-[#6b7280] font-medium">Fall 2026 Recruitment</p>
-            <h1 className="text-2xl font-bold text-[#061c2a] mt-0.5">{title}</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-[#061c2a] mt-0.5">{title}</h1>
             <p className="text-sm text-[#6b7280] mt-1">{subtitle}</p>
             {round === 1 && (
               <p className="text-xs text-[#6b7280] mt-2 max-w-2xl">
@@ -278,9 +279,9 @@ export function RoundBoard({
             )}
           </div>
           {counts && (
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-2 sm:gap-3">
               {(["total", "pending", "completed", "rejected"] as const).map((k) => (
-                <div key={k} className="rounded-lg border border-[#e4e4e7] px-4 py-2 text-center min-w-[68px]">
+                <div key={k} className="rounded-lg border border-[#e4e4e7] px-3 sm:px-4 py-2 text-center min-w-[64px] sm:min-w-[68px]">
                   <p className="text-lg font-bold text-[#061c2a]">{counts[k]}</p>
                   <p className="text-[11px] uppercase tracking-wide text-[#a1a1aa]">
                     {statusUi.countLabels[k]}
@@ -315,7 +316,7 @@ export function RoundBoard({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search applicants…"
-            className="h-9 w-64 border border-[#d4d4d8] rounded-lg px-4 text-sm text-[#111827] placeholder-[#a1a1aa] outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 transition"
+            className="h-9 w-full sm:w-64 border border-[#d4d4d8] rounded-lg px-4 text-sm text-[#111827] placeholder-[#a1a1aa] outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 transition"
           />
         </div>
 
@@ -325,8 +326,8 @@ export function RoundBoard({
           </p>
         )}
 
-        <div className="flex gap-6">
-          <div className="flex-1 min-w-0">
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className={`flex-1 min-w-0 ${selectedId ? "max-lg:hidden" : ""}`}>
             {loading ? (
               <TableSkeleton />
             ) : applicants.length === 0 ? (
@@ -385,7 +386,10 @@ export function RoundBoard({
           </div>
 
           {selected && (
-            <div className="w-[360px] flex-shrink-0 rounded-xl border border-[#e4e4e7] bg-white p-6 flex flex-col gap-5 h-fit sticky top-6">
+            <div
+              className={`${OFFICER_DETAIL_PANEL_CLASS} lg:w-[360px] lg:rounded-xl lg:border lg:p-6 lg:gap-5 lg:h-fit lg:sticky lg:top-6 gap-0 p-0`}
+            >
+              <div className="flex flex-col gap-5 p-4 sm:p-6 lg:p-0 flex-1">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-lg font-semibold text-[#111827]">{selected.firstName} {selected.lastName}</p>
@@ -540,6 +544,7 @@ export function RoundBoard({
                 >
                   {selected.status === "rejected" ? "Rejected" : "Reject Applicant"}
                 </button>
+              </div>
               </div>
             </div>
           )}

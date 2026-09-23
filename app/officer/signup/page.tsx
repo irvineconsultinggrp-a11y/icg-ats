@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
+import { AuthSplitLayout } from "@/components/layout/AuthSplitLayout";
 import { useState } from "react";
 export default function OfficerSignup() {
   const [firstName, setFirstName] = useState("");
@@ -47,31 +47,17 @@ export default function OfficerSignup() {
   }
 
   return (
-    <div className="min-h-screen flex font-sans">
-      {/* Left panel */}
-      <div className="relative w-[36%] min-w-[280px] bg-[#061c2a] overflow-hidden flex-shrink-0">
-        <Image src="/images/cityscape.png" alt="" fill className="object-cover opacity-20" priority />
-        <div className="relative z-10 flex flex-col gap-3 px-12 pt-20">
-          <div className="w-10 h-10 relative flex-shrink-0">
-            <Image src="/images/icg-icon-white.png" alt="ICG icon" fill className="object-contain" />
-          </div>
-          <h1 className="text-white text-4xl font-semibold leading-[44px] tracking-tight mt-2">
-            Officer
-            <br />
-            Sign Up
-          </h1>
-          <p className="text-white text-lg font-normal leading-7 max-w-xs">
-            Create an officer account with your team&apos;s invite code.
-          </p>
-        </div>
-        <p className="absolute bottom-8 left-0 right-0 text-center text-white text-sm leading-5 px-4">
-          © Irvine Consulting Group 2026. All Rights Reserved
-        </p>
-      </div>
-
-      {/* Right panel */}
-      <div className="flex-1 bg-white flex items-center justify-center px-8 py-12">
-        <div className="w-full max-w-[480px] flex flex-col gap-8">
+    <AuthSplitLayout
+      title={
+        <>
+          Officer
+          <br />
+          Sign Up
+        </>
+      }
+      subtitle="Create an officer account with your team's invite code."
+    >
+        <div className="w-full flex flex-col gap-8">
           <div className="flex flex-col gap-2">
             <Link
               href="/officer/login"
@@ -87,7 +73,7 @@ export default function OfficerSignup() {
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="firstName" className="text-sm font-medium text-[#111827]">First name</label>
                 <input
@@ -175,7 +161,6 @@ export default function OfficerSignup() {
             </button>
           </form>
         </div>
-      </div>
-    </div>
+    </AuthSplitLayout>
   );
 }

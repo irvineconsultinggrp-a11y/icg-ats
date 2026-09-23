@@ -495,13 +495,13 @@ export function InterviewScheduleBoard({ config }: { config: InterviewScheduleRo
 
   return (
     <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-      <div className="px-8 pt-8 pb-4 border-b border-[#e4e4e7]">
-        <h1 className="text-2xl font-bold text-[#061c2a]">{title}</h1>
+      <div className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-4 border-b border-[#e4e4e7]">
+        <h1 className="text-xl sm:text-2xl font-bold text-[#061c2a]">{title}</h1>
         <p className="text-sm text-[#6b7280] mt-1">{subtitle}</p>
       </div>
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <aside className="w-[300px] flex-shrink-0 border-r border-[#e4e4e7] bg-[#fafafa] overflow-y-auto px-4 py-5">
+      <div className="flex flex-1 min-h-0 overflow-hidden flex-col lg:flex-row">
+        <aside className="w-full lg:w-[300px] flex-shrink-0 border-b lg:border-b-0 lg:border-r border-[#e4e4e7] bg-[#fafafa] overflow-y-auto px-4 py-4 lg:py-5 max-h-[min(42vh,320px)] lg:max-h-none">
           <h2 className="text-sm font-semibold text-[#111827] mb-1">
             Round {round} · {scheduleDay}
           </h2>
@@ -543,8 +543,8 @@ export function InterviewScheduleBoard({ config }: { config: InterviewScheduleRo
         </aside>
 
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <div className="px-6 py-4 flex items-center gap-3 border-b border-[#f4f4f5]">
-            <div className="relative flex-1 max-w-sm">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center gap-2 sm:gap-3 border-b border-[#f4f4f5]">
+            <div className="relative flex-1 min-w-[140px] max-w-full sm:max-w-sm">
               <input
                 type="text"
                 value={search}
@@ -595,7 +595,7 @@ export function InterviewScheduleBoard({ config }: { config: InterviewScheduleRo
           )}
 
           {!loading && !loadError && (
-            <section className="flex-shrink-0 border-b border-[#e4e4e7] bg-[#fafafa] px-6 py-4">
+            <section className="flex-shrink-0 border-b border-[#e4e4e7] bg-[#fafafa] px-4 sm:px-6 py-4">
               <h2 className="text-sm font-semibold text-[#111827] mb-1">
                 Not scheduled yet
                 <span className="ml-2 text-sm font-normal text-[#6b7280]">({unscheduled.length})</span>
@@ -633,7 +633,7 @@ export function InterviewScheduleBoard({ config }: { config: InterviewScheduleRo
             </section>
           )}
 
-          <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-8">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 flex flex-col gap-6 sm:gap-8 min-h-0">
             {loading ? (
               <p className="text-sm text-[#6b7280]">Loading…</p>
             ) : loadError ? (

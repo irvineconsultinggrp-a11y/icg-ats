@@ -25,6 +25,10 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+.safe-area-top {
+  padding-top: max(0px, env(safe-area-inset-top));
+}
+
 /* Shared formatting for rich-text notes — used by both the editor and read-only rendering. */
 .rte-content h1 { font-size: 1.5rem; font-weight: 700; margin: 0.75rem 0 0.4rem; color: #061c2a; }
 .rte-content h2 { font-size: 1.25rem; font-weight: 700; margin: 0.75rem 0 0.35rem; color: #061c2a; }

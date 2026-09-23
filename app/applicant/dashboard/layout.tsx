@@ -1,10 +1,10 @@
+import { DashboardMobileShell } from "@/components/layout/DashboardMobileShell";
 import { Sidebar } from "./_components/Sidebar";
 
 export default function ApplicantDashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-white font-sans">
-      <Sidebar />
+    <DashboardMobileShell title="ICG Applicant" sidebar={<Sidebar />}>
       {children}
-    </div>
+    </DashboardMobileShell>
   );
 }

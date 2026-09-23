@@ -1,9 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
+import { AuthSplitLayout } from "@/components/layout/AuthSplitLayout";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
+import { signInWithPasswordNoEmailConfirm } from "@/lib/auth/portal-sign-in";
 import { createClient } from "@/utils/supabase/client";
 
 function OfficerLoginForm() {
@@ -21,15 +22,11 @@ function OfficerLoginForm() {
     }
     return "";
   });
-  const [success] = useState(() => {
-    if (searchParams.get("created") === "1") {
-      return "Account created. Sign in with your email and password.";
-    }
-    if (searchParams.get("confirmed") === "1") {
-      return "You can sign in now.";
-    }
-    return "";
-  });
+  const [success] = useState(() =>
+    searchParams.get("created") === "1"
+      ? "Account created. Sign in with your email and password."
+      : "",
+  );
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -39,20 +36,15 @@ function OfficerLoginForm() {
 
     try {
       const supabase = createClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await signInWithPasswordNoEmailConfirm(
+        supabase,
         email,
         password,
-      });
+        "officer",
+      );
 
       if (signInError) {
-        const notConfirmed = /email not confirmed|not confirmed|confirm your email/i.test(
-          signInError.message,
-        );
-        setError(
-          notConfirmed
-            ? "Please confirm your email first — check your inbox for the confirmation link we sent when you signed up."
-            : signInError.message,
-        );
+        setError(signInError.message);
         return;
       }
 
@@ -79,46 +71,17 @@ function OfficerLoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex font-sans">
-      {/* Left panel — dark navy cityscape */}
-      <div className="relative w-[36%] min-w-[280px] bg-[#061c2a] overflow-hidden flex-shrink-0">
-        <Image
-          src="/images/cityscape.png"
-          alt=""
-          fill
-          className="object-cover opacity-20"
-          priority
-        />
-
-        <div className="relative z-10 flex flex-col gap-3 px-12 pt-20">
-          <div className="w-10 h-10 relative flex-shrink-0">
-            <Image
-              src="/images/icg-icon-white.png"
-              alt="ICG icon"
-              fill
-              className="object-contain"
-            />
-          </div>
-
-          <h1 className="text-white text-4xl font-semibold leading-[44px] tracking-tight mt-2">
-            Officer
-            <br />
-            Login
-          </h1>
-
-          <p className="text-white text-lg font-normal leading-7 max-w-xs">
-            Sign in to access the ICG recruitment dashboard.
-          </p>
-        </div>
-
-        <p className="absolute bottom-8 left-0 right-0 text-center text-white text-sm leading-5 px-4">
-          © Irvine Consulting Group 2026. All Rights Reserved
-        </p>
-      </div>
-
-      {/* Right panel */}
-      <div className="flex-1 bg-white flex items-center justify-center px-8 py-12">
-        <div className="w-full max-w-[480px] flex flex-col gap-10">
+    <AuthSplitLayout
+      title={
+        <>
+          Officer
+          <br />
+          Login
+        </>
+      }
+      subtitle="Sign in to access the ICG recruitment dashboard."
+    >
+        <div className="w-full flex flex-col gap-10">
           {/* Header */}
           <div className="flex flex-col gap-2">
             <Link
@@ -261,8 +224,7 @@ function OfficerLoginForm() {
             </Link>
           </p>
         </div>
-      </div>
-    </div>
+    </AuthSplitLayout>
   );
 }
 

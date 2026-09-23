@@ -57,7 +57,7 @@ export default function BbqSocialPage() {
 
   return (
     <main className="flex-1 overflow-y-auto">
-      <div className="px-8 py-8 flex flex-col gap-6 max-w-4xl">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex flex-col gap-6 max-w-4xl">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
             <p className="text-sm text-[#6b7280] font-medium">Fall 2026 Recruitment</p>

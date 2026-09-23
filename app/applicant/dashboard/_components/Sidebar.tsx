@@ -52,7 +52,7 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="w-[272px] flex-shrink-0 border-r border-[#e4e4e7] bg-white flex flex-col justify-between h-screen sticky top-0 p-8">
+    <aside className="w-full lg:w-[272px] flex-shrink-0 border-r border-[#e4e4e7] bg-white flex flex-col justify-between h-full min-h-[100dvh] lg:h-screen lg:sticky lg:top-0 p-6 lg:p-8">
       <div className="flex flex-col gap-10">
         <div className="px-[7px]">
           <div className="relative w-[168px] h-[68px]">
@@ -71,7 +71,7 @@ export function Sidebar() {
             <Link
               key={item.key}
               href={item.href}
-              className={`flex items-center gap-3 h-[58px] w-[208px] px-5 py-4 rounded-lg font-bold text-base text-[#061c2a] transition-colors ${
+              className={`flex items-center gap-3 h-[58px] w-full max-w-[208px] px-5 py-4 rounded-lg font-bold text-base text-[#061c2a] transition-colors ${
                 active === item.key ? "bg-[#f4f4f5]" : "hover:bg-[#f9fafb]"
               }`}
             >

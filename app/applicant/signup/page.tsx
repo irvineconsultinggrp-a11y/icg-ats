@@ -2,11 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { AuthSplitLayout } from "@/components/layout/AuthSplitLayout";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { OAuthButtons } from "@/components/applicant/oauth-buttons";
 import { APPLICANT_EMAIL_ERROR, isApplicantEmailAllowed } from "@/lib/auth/applicant-email";
-import { signInWithPassword } from "@/utils/auth/applicant";
+import { signInWithPasswordNoEmailConfirm } from "@/lib/auth/portal-sign-in";
+import { ensureApplicantRole } from "@/utils/auth/applicant";
+import { createClient } from "@/utils/supabase/client";
 
 export default function ApplicantSignup() {
   const router = useRouter();
@@ -52,9 +55,20 @@ export default function ApplicantSignup() {
         return;
       }
 
-      const { error: signInError } = await signInWithPassword(email, password);
+      const supabase = createClient();
+      const { error: signInError } = await signInWithPasswordNoEmailConfirm(
+        supabase,
+        email,
+        password,
+        "applicant",
+      );
       if (signInError) {
         setError(signInError.message);
+        return;
+      }
+      const roleOk = await ensureApplicantRole();
+      if (!roleOk) {
+        setError("Account created but could not finish setup. Try signing in.");
         return;
       }
       router.push("/applicant/dashboard");
@@ -67,31 +81,18 @@ export default function ApplicantSignup() {
   }
 
   return (
-    <div className="min-h-screen flex font-sans">
-      {/* Left panel */}
-      <div className="relative w-[36%] min-w-[280px] bg-[#061c2a] overflow-hidden flex-shrink-0">
-        <Image src="/images/cityscape.png" alt="" fill className="object-cover opacity-20" priority />
-        <div className="relative z-10 flex flex-col gap-3 px-12 pt-20">
-          <div className="w-10 h-10 relative flex-shrink-0">
-            <Image src="/images/icg-icon-white.png" alt="ICG icon" fill className="object-contain" />
-          </div>
-          <h1 className="text-white text-4xl font-semibold leading-[44px] tracking-tight mt-2">
-            ICG Application
-            <br />
-            Portal
-          </h1>
-          <p className="text-white text-lg font-normal leading-7 max-w-xs">
-            Create an account to start your application.
-          </p>
-        </div>
-        <p className="absolute bottom-8 left-0 right-0 text-center text-white text-sm leading-5 px-4">
-          © Irvine Consulting Group 2026. All Rights Reserved
-        </p>
-      </div>
-
-      {/* Right panel */}
-      <div className="flex-1 bg-white flex items-center justify-center px-8 py-12 overflow-y-auto">
-        <div className="w-full max-w-[540px] border border-[#e4e4e7] rounded-[26px] p-12 flex flex-col items-center gap-8">
+    <AuthSplitLayout
+      wide
+      title={
+        <>
+          ICG Application
+          <br />
+          Portal
+        </>
+      }
+      subtitle="Create an account to start your application."
+    >
+        <div className="w-full border border-[#e4e4e7] rounded-[20px] sm:rounded-[26px] p-6 sm:p-10 lg:p-12 flex flex-col items-center gap-6 sm:gap-8">
           {/* Logo */}
           <div className="relative w-full max-w-[300px] h-[120px]">
             <Image src="/images/icg-logo.png" alt="Irvine Consulting Group" fill className="object-contain" priority />
@@ -277,7 +278,6 @@ export default function ApplicantSignup() {
             </p>
           </form>
         </div>
-      </div>
-    </div>
+    </AuthSplitLayout>
   );
 }
