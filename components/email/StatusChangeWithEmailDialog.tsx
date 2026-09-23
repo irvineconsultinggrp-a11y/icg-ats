@@ -104,7 +104,9 @@ export function StatusChangeWithEmailDialog({
       <div className="w-full max-w-lg rounded-xl bg-white border border-[#e4e4e7] shadow-xl flex flex-col max-h-[85vh]">
         <div className="px-6 py-4 border-b border-[#e4e4e7]">
           <h3 className="text-base font-semibold text-[#111827]">{actionLabel}</h3>
-          <p className="text-sm text-[#6b7280] mt-1">Update their status in the ATS and optionally notify them by email.</p>
+          <p className="text-sm text-[#6b7280] mt-1">
+            Update their status in the ATS and optionally notify them by email.
+          </p>
         </div>
         <div className="px-6 py-4 flex flex-col gap-3 overflow-y-auto flex-1">
           {error && (

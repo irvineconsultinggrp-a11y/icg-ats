@@ -2,28 +2,23 @@ import type { SendEmailInput, SendEmailResult } from "@/lib/email/send-via-resen
 import { sendViaGmail } from "@/lib/email/send-via-gmail";
 import { sendViaResend } from "@/lib/email/send-via-resend";
 
-function configuredFromLooksLikeGmail(): boolean {
-  const from = process.env.EMAIL_FROM?.trim().toLowerCase() ?? "";
-  const user = process.env.GMAIL_USER?.trim().toLowerCase() ?? "";
-  return from.includes("@gmail.com") || user.includes("@gmail.com");
-}
-
-/** Schedule/campaign mail: Gmail when app password is set (required for @gmail From). */
+/**
+ * Resend when RESEND_API_KEY is set (production). Gmail only when GMAIL_APP_PASSWORD is set.
+ * Do not infer Gmail from EMAIL_FROM alone — that breaks local/dev when From mentions @gmail.com
+ * but mail actually goes through Resend with a verified domain.
+ */
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
-  const gmailPass = process.env.GMAIL_APP_PASSWORD?.trim();
-  const useGmail = Boolean(gmailPass) || configuredFromLooksLikeGmail();
+  const resendKey = process.env.RESEND_API_KEY?.trim();
+  const gmailPass = process.env.GMAIL_APP_PASSWORD?.trim()?.replace(/\s/g, "");
 
-  if (useGmail) {
-    if (!gmailPass) {
-      return {
-        ok: false,
-        dryRun: true,
-        error:
-          "Sending from Gmail requires GMAIL_APP_PASSWORD (Google App Password for irvineconsulting.grp@gmail.com).",
-      };
-    }
+  if (resendKey) {
+    return sendViaResend(input);
+  }
+
+  if (gmailPass) {
     return sendViaGmail(input);
   }
+
   return sendViaResend(input);
 }
 

@@ -26,11 +26,11 @@ export function varsFromRecipient(
     lastName: recipient.lastName,
     fullName: `${recipient.firstName} ${recipient.lastName}`.trim(),
     email: recipient.email,
-    room: recipient.room ?? "—",
+    room: recipient.room ?? "TBD",
     roomLabel: interviewRoomEmailLabel(recipient.room),
     location: cslLocationForRoomLabel(recipient.room),
-    timeBlock: recipient.timeBlock ?? "—",
-    scheduleDate: recipient.scheduleDate ?? "—",
+    timeBlock: recipient.timeBlock ?? "TBD",
+    scheduleDate: recipient.scheduleDate ?? "TBD",
     roundLabel,
   };
 }

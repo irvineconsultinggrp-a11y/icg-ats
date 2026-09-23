@@ -142,5 +142,5 @@ export function formatSendLabel(record: ScheduleEmailSendRecord): string {
     timeStyle: "short",
   });
   const detail = parts.length > 0 ? parts.join(" · ") : "Schedule email";
-  return `Emailed ${when} — ${detail}`;
+  return `Emailed ${when} (${detail})`;
 }

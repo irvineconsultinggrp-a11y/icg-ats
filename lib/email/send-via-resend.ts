@@ -1,3 +1,5 @@
+import { resolveOutboundEmailIdentity } from "@/lib/email/email-branding";
+
 export type SendEmailInput = {
   to: string;
   subject: string;
@@ -14,9 +16,7 @@ export const DEFAULT_EMAIL_REPLY_TO = "irvineconsulting.grp@gmail.com";
 
 export async function sendViaResend(input: SendEmailInput): Promise<SendEmailResult> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.EMAIL_FROM?.trim() ?? "ICG Recruitment <onboarding@resend.dev>";
-  const replyTo =
-    process.env.EMAIL_REPLY_TO?.trim() || DEFAULT_EMAIL_REPLY_TO;
+  const { from, replyTo } = resolveOutboundEmailIdentity();
 
   if (!apiKey) {
     return {

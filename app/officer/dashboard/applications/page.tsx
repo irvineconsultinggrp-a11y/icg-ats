@@ -7,7 +7,8 @@ import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import type { ApplicantRow } from "@/lib/types/database";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import { SendTransactionalEmailModal } from "@/components/email/SendTransactionalEmailModal";
-import { StatusChangeWithEmailDialog } from "@/components/email/StatusChangeWithEmailDialog";
+import { ConfirmStatusDialog } from "@/components/email/ConfirmStatusDialog";
+import { RejectionEmailActions } from "@/components/email/RejectionEmailActions";
 import { APPLICATION_EMAIL_UI } from "@/lib/email/transactional-templates";
 import { OFFICER_DETAIL_PANEL_CLASS } from "@/components/layout/DashboardMobileShell";
 import { LazyEmailTemplatesModal } from "../_components/LazyEmailTemplatesModal";
@@ -181,7 +182,13 @@ function DetailPanel({
               <button
                 key={s}
                 type="button"
-                onClick={() => onUpdate({ status: s })}
+                onClick={() => {
+                  if (s === "rejected") {
+                    if (applicant.status !== "rejected") onRejectClick();
+                    return;
+                  }
+                  onUpdate({ status: s });
+                }}
                 className={`h-7 px-3 rounded-full text-xs font-medium border transition-all ${
                   applicant.status === s
                     ? `${STATUS_CONFIG[s].bg} ${STATUS_CONFIG[s].text} border-transparent`
@@ -227,6 +234,14 @@ function DetailPanel({
             View Resume
           </a>
         )}
+
+        {applicant.status === "rejected" ? (
+          <RejectionEmailActions
+            applicantId={applicant.id}
+            templateId="app-not-selected"
+            refreshKey={applicant.id + applicant.status}
+          />
+        ) : null}
 
         <div className="flex flex-col gap-2 pt-1">
           <button
@@ -647,13 +662,13 @@ export default function ApplicationsPage() {
 
       {selected && (
         <>
-          <StatusChangeWithEmailDialog
+          <ConfirmStatusDialog
             open={rejectDialogOpen}
             onClose={() => setRejectDialogOpen(false)}
-            applicantId={selected.id}
-            templateId="app-not-selected"
-            actionLabel="Reject application"
-            onConfirmStatus={async () => {
+            title="Reject application?"
+            description="This marks the applicant as rejected in the ATS. You can send the rejection email separately afterward."
+            confirmLabel="Mark as rejected"
+            onConfirm={async () => {
               const ok = await updateApplication(selected.id, { status: "rejected" });
               if (!ok) throw new Error("Could not update status.");
             }}

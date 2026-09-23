@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { resolveOutboundEmailIdentity } from "@/lib/email/email-branding";
 import type { SendEmailInput, SendEmailResult } from "@/lib/email/send-via-resend";
 
 export const DEFAULT_GMAIL_SENDER = "irvineconsulting.grp@gmail.com";
@@ -15,7 +16,7 @@ export async function sendViaGmail(input: SendEmailInput): Promise<SendEmailResu
     };
   }
 
-  const from = process.env.EMAIL_FROM?.trim() ?? `ICG Recruitment <${user}>`;
+  const { from, replyTo } = resolveOutboundEmailIdentity();
 
   const transporter = nodemailer.createTransport({
     service: "gmail",
@@ -24,12 +25,12 @@ export async function sendViaGmail(input: SendEmailInput): Promise<SendEmailResu
 
   try {
     const info = await transporter.sendMail({
-      from,
+      from: from.includes("@") ? from : `${from} <${user}>`,
       to: input.to,
       subject: input.subject,
       html: input.html,
       text: input.text,
-      replyTo: process.env.EMAIL_REPLY_TO?.trim() || user,
+      replyTo: replyTo || user,
     });
     return { ok: true, id: info.messageId };
   } catch (err) {

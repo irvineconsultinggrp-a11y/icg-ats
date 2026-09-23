@@ -17,7 +17,8 @@ import {
 } from "@/lib/applicants/stages";
 import type { ApplicantStats, RoundStatusCounts } from "@/app/api/applicants/stats/route";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
-import { StatusChangeWithEmailDialog } from "@/components/email/StatusChangeWithEmailDialog";
+import { ConfirmStatusDialog } from "@/components/email/ConfirmStatusDialog";
+import { RejectionEmailActions } from "@/components/email/RejectionEmailActions";
 import { OFFICER_DETAIL_PANEL_CLASS } from "@/components/layout/DashboardMobileShell";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import type { TransactionalEmailId } from "@/lib/email/transactional-templates";
@@ -408,7 +409,13 @@ export function RoundBoard({
                     <button
                       key={s}
                       type="button"
-                      onClick={() => void update(selected.id, roundToPatch(round, { status: s }))}
+                      onClick={() => {
+                        if (s === "rejected") {
+                          if (selected.status !== "rejected") setRejectDialogOpen(true);
+                          return;
+                        }
+                        void update(selected.id, roundToPatch(round, { status: s }));
+                      }}
                       className={`h-7 px-3 rounded-full text-xs font-medium border transition-all ${
                         selected.status === s
                           ? `${statusUi.meta[s].bg} ${statusUi.meta[s].text} border-transparent`
@@ -486,6 +493,14 @@ export function RoundBoard({
                 </div>
               )}
 
+              {selected.status === "rejected" ? (
+                <RejectionEmailActions
+                  applicantId={selected.id}
+                  templateId={roundRejectTemplate}
+                  refreshKey={`${selected.id}-${selected.status}`}
+                />
+              ) : null}
+
               <div className="flex flex-col gap-2 pt-1">
                 {!selectedAdvancedToNext && selected.status !== "rejected" && !confirmAdvance && (
                   <>
@@ -552,13 +567,13 @@ export function RoundBoard({
       </div>
 
       {selected && (
-        <StatusChangeWithEmailDialog
+        <ConfirmStatusDialog
           open={rejectDialogOpen}
           onClose={() => setRejectDialogOpen(false)}
-          applicantId={selected.id}
-          templateId={roundRejectTemplate}
-          actionLabel={round === 1 ? "Reject after Round 1" : "Reject after Round 2"}
-          onConfirmStatus={async () => {
+          title={round === 1 ? "Reject after Round 1?" : "Reject after Round 2?"}
+          description="This marks the applicant as rejected. Send the rejection email from their detail panel when you are ready."
+          confirmLabel="Mark as rejected"
+          onConfirm={async () => {
             const ok = await update(selected.id, roundToPatch(round, { status: "rejected" }));
             if (!ok) throw new Error("Could not update status.");
           }}

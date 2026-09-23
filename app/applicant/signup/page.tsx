@@ -5,7 +5,6 @@ import Link from "next/link";
 import { AuthSplitLayout } from "@/components/layout/AuthSplitLayout";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { OAuthButtons } from "@/components/applicant/oauth-buttons";
 import { APPLICANT_EMAIL_ERROR, isApplicantEmailAllowed } from "@/lib/auth/applicant-email";
 import { signInWithPasswordNoEmailConfirm } from "@/lib/auth/portal-sign-in";
 import { ensureApplicantRole } from "@/utils/auth/applicant";
@@ -255,16 +254,6 @@ export default function ApplicantSignup() {
                 "Create Account"
               )}
             </button>
-
-            {/* Divider */}
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-[#e4e4e7]" />
-              <span className="text-sm text-[#a1a1aa]">or continue with</span>
-              <div className="flex-1 h-px bg-[#e4e4e7]" />
-            </div>
-
-            {/* OAuth */}
-            <OAuthButtons disabled={loading} onError={setError} />
 
             {/* Sign-in link */}
             <p className="text-center text-sm text-[#a1a1aa]">

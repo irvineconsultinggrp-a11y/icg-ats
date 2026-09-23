@@ -5,7 +5,6 @@ import Link from "next/link";
 import { AuthSplitLayout } from "@/components/layout/AuthSplitLayout";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { OAuthButtons } from "@/components/applicant/oauth-buttons";
 import { APPLICANT_EMAIL_ERROR, isApplicantEmailAllowed } from "@/lib/auth/applicant-email";
 import { signInWithPasswordNoEmailConfirm } from "@/lib/auth/portal-sign-in";
 import { APPLICANT_DASHBOARD, ensureApplicantRole } from "@/utils/auth/applicant";
@@ -220,9 +219,6 @@ function ApplicantLoginForm() {
         )}
       </button>
 
-      {/* OAuth */}
-      <OAuthButtons disabled={loading} onError={setError} />
-
       {/* Sign-up link */}
       <p className="text-center text-sm text-[#a1a1aa]">
         Don&apos;t have an account?{" "}
@@ -250,7 +246,7 @@ export default function ApplicantLogin() {
           Portal
         </>
       }
-      subtitle="Sign in with your email or Google account."
+      subtitle="Sign in with the email and password you used when you applied."
     >
       <div className="w-full flex flex-col gap-4">
         <Link

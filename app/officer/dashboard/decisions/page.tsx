@@ -10,6 +10,8 @@ import {
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import { SendTransactionalEmailModal } from "@/components/email/SendTransactionalEmailModal";
+import { ConfirmStatusDialog } from "@/components/email/ConfirmStatusDialog";
+import { RejectionEmailActions } from "@/components/email/RejectionEmailActions";
 import { StatusChangeWithEmailDialog } from "@/components/email/StatusChangeWithEmailDialog";
 import { DECISION_EMAIL_UI } from "@/lib/email/transactional-templates";
 import { OFFICER_DETAIL_PANEL_CLASS } from "@/components/layout/DashboardMobileShell";
@@ -199,6 +201,14 @@ function DetailPanel({
             className="w-full border border-[#e4e4e7] rounded-lg px-4 py-3 text-sm text-[#111827] placeholder-[#a1a1aa] outline-none focus:border-[#061c2a] focus:ring-2 focus:ring-[#061c2a]/10 transition resize-none"
           />
         </div>
+
+        {decision.status === "rejected" ? (
+          <RejectionEmailActions
+            applicantId={decision.id}
+            templateId="decision-reject"
+            refreshKey={`${decision.id}-${decision.status}`}
+          />
+        ) : null}
 
         {/* Decision actions */}
         <div className="flex flex-col gap-2 pt-1">
@@ -496,7 +506,8 @@ export default function DecisionsPage() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                updateDecision(d.id, { status: "rejected" });
+                                setSelectedId(d.id);
+                                setRejectDialogOpen(true);
                               }}
                               disabled={d.status === "rejected"}
                               className="h-7 px-3 bg-red-50 text-red-600 text-xs font-medium rounded-lg border border-red-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -565,13 +576,13 @@ export default function DecisionsPage() {
               if (!ok) throw new Error("Could not update status.");
             }}
           />
-          <StatusChangeWithEmailDialog
+          <ConfirmStatusDialog
             open={rejectDialogOpen}
             onClose={() => setRejectDialogOpen(false)}
-            applicantId={selected.id}
-            templateId="decision-reject"
-            actionLabel="Reject applicant"
-            onConfirmStatus={async () => {
+            title="Reject applicant?"
+            description="This marks the final decision as rejected. Send the rejection email from the detail panel when you are ready."
+            confirmLabel="Mark as rejected"
+            onConfirm={async () => {
               const ok = await updateDecision(selected.id, { status: "rejected" });
               if (!ok) throw new Error("Could not update status.");
             }}
