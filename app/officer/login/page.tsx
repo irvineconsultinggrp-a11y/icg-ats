@@ -59,7 +59,9 @@ function OfficerLoginForm() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user?.app_metadata?.role !== "officer") {
         await supabase.auth.signOut();
-        setError("This account does not have officer access. If you're an officer, create your account with an invite code below.");
+        setError(
+          "This account does not have officer access. Use Officer Sign Up with your team invite code (not Applicant Sign Up).",
+        );
         return;
       }
 
