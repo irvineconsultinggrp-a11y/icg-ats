@@ -246,13 +246,6 @@ function DetailPanel({
         <div className="flex flex-col gap-2 pt-1">
           <button
             type="button"
-            onClick={() => onUpdate({ status: "advanced" })}
-            className="flex items-center justify-center h-11 w-full bg-[#061c2a] text-white text-sm font-medium rounded-lg hover:bg-[#0d2f47] transition-colors"
-          >
-            Advance to Coffee Chats
-          </button>
-          <button
-            type="button"
             onClick={onSendReceivedClick}
             className="flex items-center justify-center h-10 w-full border border-[#061c2a] text-[#061c2a] text-sm font-medium rounded-lg hover:bg-[#061c2a]/5 transition-colors"
           >

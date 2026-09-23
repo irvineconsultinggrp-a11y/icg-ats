@@ -7,6 +7,7 @@ import { hydrateFormFromRow } from "@/lib/applicants/form";
 import { buildSlotId, GROUP_INTERVIEW_DAYS } from "@/lib/group-interview/sessions";
 import { canApplyToPosition, formatPositionTitle, getPositionById } from "@/lib/positions";
 import type { ApplicantRow } from "@/lib/types/database";
+import { createClient } from "@/utils/supabase/client";
 
 // --- Icons ---
 
@@ -146,6 +147,7 @@ export default function ApplicationForm() {
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
 
   const [submitted, setSubmitted] = useState(false);
+  const [confirmationEmailSent, setConfirmationEmailSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
@@ -187,8 +189,15 @@ export default function ApplicationForm() {
             setExistingResumeName(hydrated.existingResumePath.split("/").pop() ?? "Resume on file");
           }
           setReadOnly(!body.canEdit);
-        } else if (!canApplyToPosition(positionId)) {
-          setReadOnly(true);
+        } else {
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user?.email) {
+            setEmail((current) => current || user.email!);
+          }
+          if (!canApplyToPosition(positionId)) {
+            setReadOnly(true);
+          }
         }
       } catch {
         if (!canApplyToPosition(positionId)) setReadOnly(true);
@@ -268,12 +277,17 @@ export default function ApplicationForm() {
         return;
       }
 
-      const body = (await res.json()) as { error?: string; applicationId?: string };
+      const body = (await res.json()) as {
+        error?: string;
+        applicationId?: string;
+        applicationReceivedEmail?: { sent?: boolean };
+      };
       if (!res.ok) {
         setSubmitError(body.error ?? "Something went wrong.");
         return;
       }
 
+      setConfirmationEmailSent(Boolean(body.applicationReceivedEmail?.sent));
       setSubmitted(true);
     } catch {
       setSubmitError("Network error. Please try again.");
@@ -308,7 +322,15 @@ export default function ApplicationForm() {
                 <span className="font-semibold text-[#061c2a]">{positionTitle}</span> position.
               </p>
               <p className="text-[#a1a1aa] text-sm mt-2">
-                We&apos;ll review your application and get back to you soon.
+                {confirmationEmailSent ? (
+                  <>
+                    We sent a confirmation to{" "}
+                    <span className="font-medium text-[#52525b]">{email}</span>. Check your inbox
+                    (and spam) for next steps.
+                  </>
+                ) : (
+                  <>We&apos;ll review your application and get back to you soon.</>
+                )}
               </p>
             </div>
             <Link

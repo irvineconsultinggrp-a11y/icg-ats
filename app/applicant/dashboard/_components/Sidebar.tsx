@@ -5,15 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AccountMenu } from "./AccountMenu";
 
-function HouseIcon({ className }: { className?: string }) {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      <polyline points="9 22 9 12 15 12 15 22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-}
-
 function PencilIcon({ className }: { className?: string }) {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
@@ -32,13 +23,11 @@ function UsersIcon({ className }: { className?: string }) {
   );
 }
 
-type ApplicantNav = "home" | "applications" | "coffee-chats";
+type ApplicantNav = "applications" | "coffee-chats";
 
 function getActiveNav(pathname: string): ApplicantNav {
   if (pathname.includes("/coffee-chats")) return "coffee-chats";
-  if (pathname.includes("/apply/")) return "applications";
-  if (pathname === "/applicant/dashboard") return "applications";
-  return "home";
+  return "applications";
 }
 
 export function Sidebar() {
@@ -46,7 +35,6 @@ export function Sidebar() {
   const active = getActiveNav(pathname);
 
   const navItems: { key: ApplicantNav; label: string; icon: React.ReactNode; href: string }[] = [
-    { key: "home", label: "Home", icon: <HouseIcon />, href: "/applicant/dashboard" },
     { key: "applications", label: "Applications", icon: <PencilIcon />, href: "/applicant/dashboard" },
     { key: "coffee-chats", label: "Coffee Chats", icon: <UsersIcon />, href: "/applicant/dashboard/coffee-chats" },
   ];

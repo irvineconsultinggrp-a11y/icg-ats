@@ -9,6 +9,7 @@ import {
 import { parseOfficerApplicantPatch } from "@/lib/applicants/stages";
 import { roleFromUser, requireOfficer } from "@/lib/auth/session";
 import { createClient } from "@/utils/supabase/server";
+import { maybeSendApplicationReceivedEmail } from "@/lib/email/maybe-send-application-received-email";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 const RESUME_BUCKET = "resumes";
@@ -148,7 +149,12 @@ export async function PATCH(request: Request, context: RouteContext) {
       await admin.from("applicants").update({ resume_path: resumePath }).eq("id", id);
     }
 
-    return NextResponse.json({ data: { ...updated, resume_path: resumePath } });
+    const applicationReceivedEmail = await maybeSendApplicationReceivedEmail(id);
+
+    return NextResponse.json({
+      data: { ...updated, resume_path: resumePath },
+      applicationReceivedEmail,
+    });
   }
 
   if (role !== "officer") {

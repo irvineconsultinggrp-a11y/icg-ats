@@ -5,11 +5,7 @@ import { fetchPipelineApplicants } from "@/lib/applicants/stages";
 import type { ApplicantRow } from "@/lib/types/database";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
-import { SendTransactionalEmailModal } from "@/components/email/SendTransactionalEmailModal";
-import {
-  COFFEE_CHAT_EMAIL_UI,
-  type TransactionalEmailId,
-} from "@/lib/email/transactional-templates";
+import { COFFEE_CHAT_EMAIL_UI } from "@/lib/email/transactional-templates";
 import { OFFICER_DETAIL_PANEL_CLASS } from "@/components/layout/DashboardMobileShell";
 import { LazyEmailTemplatesModal } from "../_components/LazyEmailTemplatesModal";
 import { getDefaultCoffeeChatCalendlyUrl } from "@/lib/calendly";
@@ -114,12 +110,10 @@ function DetailPanel({
   applicant,
   onClose,
   onRatingChange,
-  onSendEmail,
 }: {
   applicant: ApplicantSummary;
   onClose: () => void;
   onRatingChange: () => void;
-  onSendEmail: (templateId: TransactionalEmailId) => void;
 }) {
   const initials = `${applicant.firstName[0]}${applicant.lastName[0]}`;
 
@@ -156,23 +150,6 @@ function DetailPanel({
           ))}
         </div>
 
-        <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={() => onSendEmail("cc-invitation")}
-            className="h-10 w-full rounded-lg bg-[#061c2a] text-white text-sm font-medium hover:bg-[#0d2f47]"
-          >
-            Send coffee chat invite
-          </button>
-          <button
-            type="button"
-            onClick={() => onSendEmail("cc-reminder")}
-            className="h-10 w-full rounded-lg border border-[#061c2a] text-[#061c2a] text-sm font-medium hover:bg-[#061c2a]/5"
-          >
-            Send chat reminder
-          </button>
-        </div>
-
         <NotesFolder
           applicantId={applicant.id}
           applicantName={`${applicant.firstName} ${applicant.lastName}`}
@@ -196,8 +173,6 @@ export default function CoffeeChatsPage() {
   const debouncedSearch = useDebouncedValue(search);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
-  const [sendEmailOpen, setSendEmailOpen] = useState(false);
-  const [sendTemplateId, setSendTemplateId] = useState<TransactionalEmailId>("cc-invitation");
   const [ratingSort, setRatingSort] = useState<RatingSort>("greens_desc");
   const [signalByApplicant, setSignalByApplicant] = useState<Record<string, NoteSignalCounts>>({});
   const [loading, setLoading] = useState(true);
@@ -476,22 +451,9 @@ export default function CoffeeChatsPage() {
             }}
             onClose={() => setSelectedId(null)}
             onRatingChange={() => void refreshSignals()}
-            onSendEmail={(templateId) => {
-              setSendTemplateId(templateId);
-              setSendEmailOpen(true);
-            }}
           />
         )}
       </div>
-
-      {selected && (
-        <SendTransactionalEmailModal
-          open={sendEmailOpen}
-          onClose={() => setSendEmailOpen(false)}
-          applicantId={selected.id}
-          templateId={sendTemplateId}
-        />
-      )}
 
       <LazyEmailTemplatesModal
         isOpen={templatesOpen}
